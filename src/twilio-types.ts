@@ -23,63 +23,32 @@ type SendMark = {
 /****************************************************
  Twilio Conversation Relay Messages
 ****************************************************/
-export type TwilioRelayMessage =
-  | ConnectedEvent
-  | DTMFEvent
-  | MarkEvent
-  | MediaEvent
-  | StartEvent
-  | StopEvent;
+export type TwilioRelayMessage = PromptComplete | SetupMessage;
 
 type ExtractMessageEvent<T> = T extends { event: infer U } ? U : never;
 export type TwilioRelayMessageTypes = ExtractMessageEvent<TwilioRelayMessage>;
 
-type ConnectedEvent = {
-  event: "connected";
-  protocol: string;
-  version: string;
+type PromptComplete = {
+  type: "prompt";
+  voicePrompt: string;
+  lang: "en-US";
+  last: true;
 };
 
-type DTMFEvent = {
-  event: "dtmf";
-  dtmf: { digit: string; track: string };
-  sequenceNumber: number;
-  streamSid: string;
-};
-
-export type MarkEvent = {
-  event: "mark";
-  mark: { name: string };
-  sequenceNumber: number;
-  streamSid: string;
-};
-
-export type MediaEvent = {
-  event: "media";
-  sequenceNumber: number;
-  media: { track: string; chunk: string; timestamp: string; payload: string };
-  streamSid: string;
-};
-
-type StartEvent = {
-  event: "start";
-  sequenceNumber: string;
-  start: {
-    accountSid: string;
-    streamSid: string;
-    callSid: string;
-    tracks: string[];
-    mediaFormat: { encoding: string; sampleRate: number; channels: number };
-    customParameters: Record<string, unknown>;
-  };
-  streamSid: string;
-};
-
-type StopEvent = {
-  event: "stop";
-  sequenceNumber: string;
-  streamSid: string;
-  stop: { accountSid: string; callSid: string };
+type SetupMessage = {
+  accountSid: string;
+  applicationSid: string | null;
+  callerName: string;
+  callSid: string;
+  callStatus: string;
+  callType: "PSTN";
+  direction: "inbound";
+  forwardedFrom: string;
+  from: string;
+  parentCallSid: string;
+  sessionId: string;
+  to: string;
+  type: "setup";
 };
 
 /****************************************************
