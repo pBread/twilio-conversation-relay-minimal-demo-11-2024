@@ -1,8 +1,7 @@
 /****************************************************
- Twilio Media Stream Actions
- https://www.twilio.com/docs/voice/media-streams/websocket-messages#send-websocket-messages-to-twilio
+ Twilio Conversation Relay Actions
 ****************************************************/
-export type TwilioStreamAction = Clear | SendAudio | SendMark;
+export type TwilioAction = Clear | SendAudio | SendMark;
 
 type Clear = {
   event: "clear";
@@ -22,10 +21,9 @@ type SendMark = {
 };
 
 /****************************************************
- Twilio Media Stream Messages
- https://www.twilio.com/docs/voice/media-streams/websocket-messages
+ Twilio Conversation Relay Messages
 ****************************************************/
-export type TwilioStreamMessage =
+export type TwilioRelayMessage =
   | ConnectedEvent
   | DTMFEvent
   | MarkEvent
@@ -34,7 +32,7 @@ export type TwilioStreamMessage =
   | StopEvent;
 
 type ExtractMessageEvent<T> = T extends { event: infer U } ? U : never;
-export type TwilioStreamMessageTypes = ExtractMessageEvent<TwilioStreamMessage>;
+export type TwilioRelayMessageTypes = ExtractMessageEvent<TwilioRelayMessage>;
 
 type ConnectedEvent = {
   event: "connected";
