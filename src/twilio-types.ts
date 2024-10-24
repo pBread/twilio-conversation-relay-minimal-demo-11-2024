@@ -1,34 +1,66 @@
 /****************************************************
  Twilio Conversation Relay Actions
 ****************************************************/
-export type TwilioAction = Clear | SendAudio | SendMark;
+export type TwilioAction =
+  | EndSession
+  | PlayMedia
+  | SendDigits
+  | SendTextToken
+  | SwitchLanguage;
 
-type Clear = {
-  event: "clear";
-  streamSid: string;
+type EndSession = {
+  type: "end";
+  handoffData: string; // stringified json
 };
 
-type SendAudio = {
-  event: "media";
-  streamSid: string;
-  media: { payload: string };
+type PlayMedia = {
+  type: "play";
+  loop?: 1; // Default is 1
+  preemptible?: false; // Default is false
+  source: string;
 };
 
-type SendMark = {
-  event: "mark";
-  streamSid: string;
-  mark: { name: string };
+type SendDigits = {
+  type: "sendDigits";
+  digits: string;
+};
+
+type SendTextToken = {
+  type: "text";
+  last: boolean;
+  token: string;
+};
+
+type SwitchLanguage = {
+  type: "transcriptionLanguage";
+  lang: string;
 };
 
 /****************************************************
  Twilio Conversation Relay Messages
 ****************************************************/
-export type TwilioRelayMessage = PromptComplete | SetupMessage;
+export type TwilioRelayMessage =
+  | CustomerInterrupt
+  | DTMFMessage
+  | PromptCompleteMessage
+  | SetupMessage;
 
 type ExtractMessageEvent<T> = T extends { event: infer U } ? U : never;
 export type TwilioRelayMessageTypes = ExtractMessageEvent<TwilioRelayMessage>;
 
-type PromptComplete = {
+type CustomerInterrupt = {
+  type: "interrupt";
+
+  durationUntilInterruptMs: string;
+  utteranceUntilInterrupt: string;
+};
+
+type DTMFMessage = {
+  type: "dtmf";
+  digit: string;
+};
+
+type PromptCompleteMessage = {
   type: "prompt";
   voicePrompt: string;
   lang: "en-US";

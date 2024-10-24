@@ -14,7 +14,7 @@ app.use(express.urlencoded({ extended: true })).use(express.json());
  Twilio Voice Webhook Endpoints
 ****************************************************/
 app.post("/incoming-call", async (req, res) => {
-  const { From, To, CallSid } = req.body;
+  const { CallSid, From, To } = req.body;
   console.log(`/incoming-call from ${From} to ${To}`);
 
   try {
