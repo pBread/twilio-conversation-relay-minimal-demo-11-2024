@@ -1,6 +1,7 @@
 import dotenv from "dotenv-flow";
 import express from "express";
 import ExpressWs from "express-ws";
+import * as demo from "../demo";
 import type { CallStatus } from "./twilio-types";
 
 dotenv.config();
@@ -23,7 +24,16 @@ app.post("/incoming-call", async (req, res) => {
     res.end(`
         <Response>
             <Connect>
-                <ConversationRelay url="wss://${HOSTNAME}/ai-relay/${CallSid}" />
+                <ConversationRelay 
+                  url="wss://${HOSTNAME}/ai-relay/${CallSid}"
+                  welcomeGreeting="${demo.greeting}"
+                  welcomeGreetingInterruptible="true"
+
+                  interruptible="true"
+
+                  voice="${demo.tts.voice}"
+                  ttsProvider="${demo.tts.provider}"
+                />
             </Connect>
         </Response>
           `);
