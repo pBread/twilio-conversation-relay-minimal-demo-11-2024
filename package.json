@@ -3,6 +3,7 @@
   "name": "twilio-conversation-relay-template",
   "scripts": {
     "dev": "nodemon --exec 'ts-node src/index.ts' --ext 'ts,js,json' --watch 'src'",
+    "grok": "node scripts/ngrok.js",
     "start": "ts-node src/index.ts"
   },
   "version": "1.0.0",
