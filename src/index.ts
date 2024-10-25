@@ -5,7 +5,7 @@ import * as demo from "../demo";
 import type { CallStatus } from "./twilio-types";
 
 dotenv.config();
-const { HOSTNAME } = process.env;
+const { HOSTNAME, PORT = "3000" } = process.env;
 
 const { app } = ExpressWs(express());
 app.use(express.urlencoded({ extended: true })).use(express.json());
@@ -66,7 +66,6 @@ app.ws("/ai-relay/:callSid", (ws) => {
 /****************************************************
  Start Server
 ****************************************************/
-const port = process.env.PORT || "3000";
-app.listen(port, () => {
-  console.log(`server running on http://localhost:${port}`);
+app.listen(PORT, () => {
+  console.log(`server running on http://localhost:${PORT}`);
 });
