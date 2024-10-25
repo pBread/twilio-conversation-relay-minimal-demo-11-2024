@@ -30,8 +30,6 @@ app.post("/incoming-call", async (req, res) => {
                   welcomeGreeting="${demo.greeting}"
                   welcomeGreetingInterruptible="true"
 
-                  interruptible="true"
-
                   voice="${demo.tts.voice}"
                   ttsProvider="${demo.tts.provider}"
                 />
