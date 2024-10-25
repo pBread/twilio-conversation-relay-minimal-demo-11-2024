@@ -8,24 +8,24 @@ export type TwilioAction =
   | SendTextToken
   | SwitchLanguage;
 
-type EndSession = {
+export type EndSession = {
   type: "end";
   handoffData: string; // stringified json
 };
 
-type PlayMedia = {
+export type PlayMedia = {
   type: "play";
   loop?: 1; // Default is 1
   preemptible?: false; // Default is false
   source: string;
 };
 
-type SendDigits = {
+export type SendDigits = {
   type: "sendDigits";
   digits: string;
 };
 
-type SendTextToken = {
+export type SendTextToken = {
   type: "text";
   last: boolean;
   token: string;

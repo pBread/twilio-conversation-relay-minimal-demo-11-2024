@@ -1,11 +1,16 @@
 import dotenv from "dotenv-flow";
 import twilio from "twilio";
 import type { WebSocket } from "ws";
-import { TwilioRelayMessage, TwilioRelayMessageTypes } from "./twilio-types";
+import {
+  EndSession,
+  SendTextToken,
+  TwilioRelayMessage,
+  TwilioRelayMessageTypes,
+} from "./twilio-types";
 
 dotenv.config();
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
-const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+export const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
 export let ws: WebSocket; // media stream websocket
 export const setWs = (wss: WebSocket) => (ws = wss);
@@ -17,13 +22,17 @@ export const setCallSid = (sid: string) => (callSid = sid);
  Conversation Relay Actions
 ****************************************************/
 export function endSession(handoffData: {}) {
-  ws.send(
-    JSON.stringify({ type: "end", handoffData: JSON.stringify(handoffData) })
-  );
+  const action: EndSession = {
+    type: "end",
+    handoffData: JSON.stringify(handoffData),
+  };
+
+  ws.send(JSON.stringify(action));
 }
 
 export function sendToken(token: string, last: boolean = false) {
-  ws.send(JSON.stringify({ type: "text", token, last }));
+  const action: SendTextToken = { type: "text", token, last };
+  ws.send(JSON.stringify(action));
 }
 /****************************************************
  Conversation Relay Message Listener
