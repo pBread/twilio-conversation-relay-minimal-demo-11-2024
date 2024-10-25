@@ -13,9 +13,6 @@ export const setWs = (wss: WebSocket) => (ws = wss);
 let callSid: string;
 export const setCallSid = (sid: string) => (callSid = sid);
 
-let streamSid: string;
-export const setStreamSid = (sid: string) => (streamSid = sid);
-
 /****************************************************
  Conversation Relay Actions
 ****************************************************/
