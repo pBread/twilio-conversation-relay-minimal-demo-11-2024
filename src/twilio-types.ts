@@ -45,7 +45,7 @@ export type TwilioRelayMessage =
   | PromptCompleteMessage
   | SetupMessage;
 
-type ExtractMessageEvent<T> = T extends { event: infer U } ? U : never;
+type ExtractMessageEvent<T> = T extends { type: infer U } ? U : never;
 export type TwilioRelayMessageTypes = ExtractMessageEvent<TwilioRelayMessage>;
 
 type CustomerInterrupt = {
