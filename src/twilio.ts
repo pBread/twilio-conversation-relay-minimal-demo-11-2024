@@ -1,7 +1,9 @@
+import dotenv from "dotenv-flow";
 import twilio from "twilio";
 import type { WebSocket } from "ws";
 import { TwilioRelayMessage, TwilioRelayMessageTypes } from "./twilio-types";
 
+dotenv.config();
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
 const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 

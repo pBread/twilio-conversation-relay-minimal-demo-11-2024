@@ -70,11 +70,11 @@ app.ws("/ai-relay", (ws, req) => {
     console.log("/ai-relay prompt", msg);
   });
 
-  ws.on("message", (data) => {
-    const msg = JSON.parse(data.toString());
-
-    console.log(msg);
+  twlo.onMessage("interrupt", (msg) => {
+    console.log("/ai-relay interrupt", msg);
   });
+
+  twlo.onMessage("dtmf", (msg) => console.log("dtmf", msg));
 });
 
 /****************************************************
