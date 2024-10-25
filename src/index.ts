@@ -2,6 +2,7 @@ import dotenv from "dotenv-flow";
 import express from "express";
 import ExpressWs from "express-ws";
 import * as demo from "../demo";
+import * as twlo from "./twilio";
 import type { CallStatus } from "./twilio-types";
 
 dotenv.config();
@@ -14,7 +15,7 @@ app.use(express.urlencoded({ extended: true })).use(express.json());
  Twilio Voice Webhook Endpoints
 ****************************************************/
 app.post("/incoming-call", async (req, res) => {
-  const { CallSid, From, To } = req.body;
+  const { From, To } = req.body;
   console.log(`/incoming-call from ${From} to ${To}`);
 
   try {
@@ -25,7 +26,7 @@ app.post("/incoming-call", async (req, res) => {
         <Response>
             <Connect>
                 <ConversationRelay 
-                  url="wss://${HOSTNAME}/ai-relay/${CallSid}"
+                  url="wss://${HOSTNAME}/ai-relay"
                   welcomeGreeting="${demo.greeting}"
                   welcomeGreetingInterruptible="true"
 
@@ -53,8 +54,21 @@ app.post("/call-status-update", async (req, res) => {
 /****************************************************
  Conversation Relay Websocket
 ****************************************************/
-app.ws("/ai-relay/:callSid", (ws) => {
-  console.log("incoming websocket");
+app.ws("/ai-relay", (ws, req) => {
+  console.log("/ai-relay new websocket");
+
+  twlo.setWs(ws);
+
+  twlo.onMessage("setup", (msg) => {
+    console.log("/ai-relay setup", msg);
+
+    twlo.setCallSid(msg.callSid);
+    twlo.startCallRecording();
+  });
+
+  twlo.onMessage("prompt", (msg) => {
+    console.log("/ai-relay prompt", msg);
+  });
 
   ws.on("message", (data) => {
     const msg = JSON.parse(data.toString());
