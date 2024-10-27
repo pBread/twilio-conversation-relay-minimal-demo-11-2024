@@ -3,11 +3,11 @@ import path from "path";
 
 const COLORS = {
   CLEAR: "\x1b[0m", // Clear
-  DEBUG: "\x1b[36m%s", // Cyan
-  INFO: "\x1b[37m%s", // White
-  ERROR: "\x1b[31m%s", // Red
-  SUCCESS: "\x1b[32m%s", // Green
-  WARN: "\x1b[33m%s", // Yellow
+  DEBUG: "\x1b[36m", // Cyan
+  INFO: "\x1b[37m", // White
+  ERROR: "\x1b[31m", // Red
+  SUCCESS: "\x1b[32m", // Green
+  WARN: "\x1b[33m", // Yellow
 } as const;
 
 let start = Date.now();
@@ -41,27 +41,38 @@ const getElapsed = () => {
   const sec = Math.floor((elapsed % (60 * 1000)) / 1000);
   const ms = elapsed % 1000;
 
-  return `\
-${min.toString().padStart(3, "0")}m \
-${sec.toString().padStart(2, "0")}s \
-${ms.toString().padStart(3, "0")}ms`;
+  return [
+    `${min.toString().padStart(3, "0")}m`,
+    `${sec.toString().padStart(2, "0")}s`,
+    `${ms.toString().padStart(3, "0")}ms`,
+  ].join(" ");
 };
 
-function log(level: keyof typeof COLORS, ...msg: any[]) {
+function log(level: keyof typeof COLORS, ...msgs: any[]) {
   try {
-    logStream.write(`${[level, ...msg].join(" ")}\n`);
+    const formattedMsg = msgs
+      .map((m) => (typeof m === "object" ? JSON.stringify(m, null, 2) : m))
+      .join(" ");
+    logStream.write(`${level} ${formattedMsg}\n`);
   } catch (error) {}
 
+  const color = COLORS[level];
+
+  let _msgs = msgs.flatMap((msg) =>
+    (typeof msg === "object" && msg !== null) || Array.isArray(msg)
+      ? [COLORS.CLEAR, msg, color]
+      : String(msg)
+  );
+
   console.log(
-    COLORS[level].padEnd(7, " "),
-    `${level.padEnd(7, " ")}`,
-    ...msg,
+    `${color}${level.padEnd(7, " ")} ${getElapsed()}`,
+    ..._msgs,
     COLORS.CLEAR
   );
 }
 
-export const debug = (...msg: any) => log("DEBUG", getElapsed(), ...msg);
-export const error = (...msg: any) => log("ERROR", getElapsed(), ...msg);
-export const info = (...msg: any) => log("INFO", getElapsed(), ...msg);
-export const success = (...msg: any) => log("SUCCESS", getElapsed(), ...msg);
-export const warn = (...msg: any) => log("WARN", getElapsed(), ...msg);
+export const debug = (...msg: any) => log("DEBUG", ...msg);
+export const error = (...msg: any) => log("ERROR", ...msg);
+export const info = (...msg: any) => log("INFO", ...msg);
+export const success = (...msg: any) => log("SUCCESS", ...msg);
+export const warn = (...msg: any) => log("WARN", ...msg);
