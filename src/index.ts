@@ -2,6 +2,7 @@ import dotenv from "dotenv-flow";
 import express from "express";
 import ExpressWs from "express-ws";
 import * as demo from "../demo";
+import * as log from "./logger";
 import * as twlo from "./twilio";
 import type { CallStatus } from "./twilio-types";
 
@@ -15,8 +16,9 @@ app.use(express.urlencoded({ extended: true })).use(express.json());
  Twilio Voice Webhook Endpoints
 ****************************************************/
 app.post("/incoming-call", async (req, res) => {
-  const { From, To } = req.body;
-  console.log(`/incoming-call from ${From} to ${To}`);
+  const { CallSid, From, To } = req.body;
+  log.reset();
+  log.success(`/incoming-call From ${From} To ${To} CallSid ${CallSid}`);
 
   try {
     res.status(200);
@@ -26,7 +28,7 @@ app.post("/incoming-call", async (req, res) => {
         <Response>
             <Connect>
                 <ConversationRelay 
-                  url="wss://${HOSTNAME}/ai-relay"
+                  url="wss://${HOSTNAME}/convo-relay"
                   welcomeGreeting="${demo.greeting}"
                   welcomeGreetingInterruptible="true"
 
@@ -43,8 +45,12 @@ app.post("/incoming-call", async (req, res) => {
 });
 
 app.post("/call-status-update", async (req, res) => {
+  const callSid = req.body.CallSid;
   const status = req.body.CallStatus as CallStatus;
-  console.log(`/call-status-update ${status}`);
+  const msg = `/call-status-update ${status} CallSid ${callSid}`;
+
+  if (status === "error") log.error(msg);
+  else log.info(msg);
 
   res.status(200).send();
 });
@@ -52,27 +58,27 @@ app.post("/call-status-update", async (req, res) => {
 /****************************************************
  Conversation Relay Websocket
 ****************************************************/
-app.ws("/ai-relay", (ws, req) => {
-  console.log("/ai-relay new websocket");
+app.ws("/convo-relay", (ws, req) => {
+  log.success("/convo-relay websocket established");
 
   twlo.setWs(ws);
 
   twlo.onMessage("setup", (msg) => {
-    console.log("/ai-relay setup", msg);
+    log.debug("/convo-relay setup", msg);
 
     twlo.setCallSid(msg.callSid);
     twlo.startCallRecording();
   });
 
   twlo.onMessage("prompt", (msg) => {
-    console.log("/ai-relay prompt", msg);
+    log.debug("/convo-relay prompt", msg);
   });
 
   twlo.onMessage("interrupt", (msg) => {
-    console.log("/ai-relay interrupt", msg);
+    log.debug("/convo-relay interrupt", msg);
   });
 
-  twlo.onMessage("dtmf", (msg) => console.log("dtmf", msg));
+  twlo.onMessage("dtmf", (msg) => log.debug("dtmf", msg));
 });
 
 /****************************************************
@@ -80,4 +86,5 @@ app.ws("/ai-relay", (ws, req) => {
 ****************************************************/
 app.listen(PORT, () => {
   console.log(`server running on http://localhost:${PORT}`);
+  console.log(`expected public base URL https://${HOSTNAME}`);
 });
