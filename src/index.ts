@@ -7,7 +7,7 @@ import * as twlo from "./twilio";
 import type { CallStatus } from "./twilio-types";
 
 dotenv.config();
-const { HOSTNAME, PORT = "3000" } = process.env;
+const { HOSTNAME, PORT = "3000", RECORD_CALL } = process.env;
 
 const { app } = ExpressWs(express());
 app.use(express.urlencoded({ extended: true })).use(express.json());
@@ -67,7 +67,7 @@ app.ws("/convo-relay", (ws, req) => {
     log.debug("/convo-relay setup", msg);
 
     twlo.setCallSid(msg.callSid);
-    twlo.startCallRecording();
+    if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
   });
 
   twlo.onMessage("prompt", (msg) => {
