@@ -59,23 +59,26 @@ app.post("/call-status-update", async (req, res) => {
  Conversation Relay Websocket
 ****************************************************/
 app.ws("/convo-relay/:callSid", (ws, req) => {
-  log.success("/convo-relay websocket established");
+  log.info("/convo-relay websocket initializing");
 
   twlo.setCallSid(req.params.callSid);
   twlo.setWs(ws);
 
   twlo.onMessage("setup", (msg) => {
-    log.debug("/convo-relay setup", msg);
+    log.success(`/convo-relay websocket initialized`);
 
     if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
   });
 
   twlo.onMessage("prompt", (msg) => {
-    log.debug("/convo-relay prompt", msg);
     if (!msg.last) return; // partial speech
+
+    log.info(`human speech complete \n${msg.voicePrompt}`);
   });
 
   twlo.onMessage("interrupt", (msg) => {
+    log.info(`human interruption`);
+
     log.debug("/convo-relay interrupt", msg);
   });
 
