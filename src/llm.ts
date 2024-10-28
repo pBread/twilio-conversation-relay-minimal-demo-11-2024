@@ -71,8 +71,17 @@ function createAssistantMessage(
 }
 
 interface SystemMessage extends ChatCompletionSystemMessageParam, StoreRecord {}
+
 interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
+
 interface UserMessage extends ChatCompletionUserMessageParam, StoreRecord {}
+export function createUserMessage(content: string) {
+  const id = idx++;
+  const msg: UserMessage = { id, idx: id, role: "user", content };
+  msgMap.set(msg.id, msg);
+
+  return msg;
+}
 
 function appendContent(id: number | string, content: string) {
   let msg = msgMap.get(id);
@@ -115,18 +124,15 @@ function cleanObj(obj: { [key: string]: any }) {
 }
 
 /****************************************************
- Methods
+ Chat Completion Handling
 ****************************************************/
-export function createUserMessage(content: string) {
-  const id = idx++;
-  const msg: UserMessage = { id, idx: id, role: "user", content };
-  msgMap.set(msg.id, msg);
-
-  return msg;
-}
-
-let stream: null | Stream<ChatCompletionChunk>; // this demo only supports one call at a time hence there is only one stream open at any time
 let activeId: null | string;
+let stream: null | Stream<ChatCompletionChunk>; // this demo only supports one call at a time hence there is only one stream open at any time
+
+export async function kill() {
+  activeId = null;
+  stream?.controller.abort();
+}
 
 export async function doCompletion() {
   if (stream) log.warn("doCompletion called when stream exists");
@@ -145,7 +151,6 @@ export async function doCompletion() {
   let role: Roles | undefined;
 
   for await (const chunk of stream) {
-    log.debug("stream chunk\n", JSON.stringify(chunk, null, 2));
     const choice = chunk.choices[0];
 
     // is first chunk
@@ -159,10 +164,13 @@ export async function doCompletion() {
           choice.delta as ChatCompletionAssistantMessageParam
         );
       else log.error(`unhandled delta for role ${role}`, choice.delta);
-    } else {
-      appendContent(activeId, choice.delta.content as string);
+    } else appendContent(activeId, choice.delta.content as string);
+
+    if (role === "assistant" && choice.delta.content)
       eventEmitter.emit("speech", choice.delta.content as string);
-    }
+
+    if (role !== "assistant")
+      log.debug("stream chunk\n", JSON.stringify(chunk, null, 2));
 
     if (choice.finish_reason === "stop") {
       log.debug("last chunk!", getAllMessages());
