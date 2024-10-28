@@ -31,7 +31,7 @@ export function endSession(handoffData: {}) {
   ws.send(JSON.stringify(action));
 }
 
-export function sendToken(token: string, last: boolean = false) {
+export function textToSpeech(token: string, last: boolean = false) {
   const action: SendTextToken = { type: "text", token, last };
   ws.send(JSON.stringify(action));
 }

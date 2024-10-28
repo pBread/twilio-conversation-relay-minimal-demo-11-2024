@@ -10,8 +10,26 @@ import type {
 import type { Stream } from "openai/streaming";
 import * as demo from "../demo";
 import * as log from "./logger";
+import EventEmitter from "events";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+/****************************************************
+ LLM Events Emitter
+****************************************************/
+class LLMEventEmitter extends EventEmitter {
+  emit = <K extends keyof Events>(event: K, ...args: Parameters<Events[K]>) =>
+    super.emit(event, ...args);
+  on = <K extends keyof Events>(event: K, listener: Events[K]): this =>
+    super.on(event, listener);
+}
+
+interface Events {
+  speech: (text: string) => void;
+}
+
+const eventEmitter = new LLMEventEmitter();
+export const on = eventEmitter.on;
 
 /****************************************************
  Message Store
@@ -28,9 +46,15 @@ export type StoreMessage =
 type ExtractMessageRoles<T> = T extends { role: infer U } ? U : never;
 type Roles = ExtractMessageRoles<StoreMessage>;
 
-interface AssistantMessage extends ChatCompletionAssistantMessageParam {
-  id: string;
+// properties shared with all message types
+interface StoreRecord {
+  id: number | string;
   idx: number;
+}
+
+interface AssistantMessage
+  extends ChatCompletionAssistantMessageParam,
+    StoreRecord {
   finish_reason?:
     | "tool_calls"
     | "function_call"
@@ -46,18 +70,9 @@ function createAssistantMessage(
   msgMap.set(id, msg);
 }
 
-interface SystemMessage extends ChatCompletionSystemMessageParam {
-  id: number;
-  idx: number;
-}
-interface ToolMessage extends ChatCompletionToolMessageParam {
-  id: string;
-  idx: number;
-}
-interface UserMessage extends ChatCompletionUserMessageParam {
-  id: number;
-  idx: number;
-}
+interface SystemMessage extends ChatCompletionSystemMessageParam, StoreRecord {}
+interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
+interface UserMessage extends ChatCompletionUserMessageParam, StoreRecord {}
 
 function appendContent(id: number | string, content: string) {
   let msg = msgMap.get(id);
@@ -144,13 +159,16 @@ export async function doCompletion() {
           choice.delta as ChatCompletionAssistantMessageParam
         );
       else log.error(`unhandled delta for role ${role}`, choice.delta);
-    } else appendContent(activeId, choice.delta.content as string);
+    } else {
+      appendContent(activeId, choice.delta.content as string);
+      eventEmitter.emit("speech", choice.delta.content as string);
+    }
 
     if (choice.finish_reason === "stop") {
       log.debug("last chunk!", getAllMessages());
-      activeId = null;
     }
   }
 
+  activeId = null;
   stream = null;
 }

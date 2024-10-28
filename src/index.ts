@@ -71,6 +71,9 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
     if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
   });
 
+  // send LLM generated
+  llm.on("speech", (text) => twlo.textToSpeech(text));
+
   twlo.onMessage("prompt", (msg) => {
     if (!msg.last) return; // partial speech
 
