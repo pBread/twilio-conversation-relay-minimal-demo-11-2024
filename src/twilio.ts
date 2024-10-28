@@ -7,6 +7,7 @@ import {
   TwilioRelayMessage,
   TwilioRelayMessageTypes,
 } from "./twilio-types";
+import * as log from "./logger";
 
 dotenv.config();
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
@@ -51,8 +52,16 @@ export function onMessage<T extends TwilioRelayMessageTypes>(
  Call Actions
 ****************************************************/
 export async function startCallRecording() {
-  return client.calls(callSid).recordings.create({
+  const rec = await client.calls(callSid).recordings.create({
     recordingStatusCallback: `https://${process.env.HOSTNAME}/recording-status`,
     recordingStatusCallbackMethod: `POST`,
   });
+
+  if (rec.errorCode)
+    return log.error(
+      `could not start call recording, error code ${rec.errorCode}`
+    );
+
+  const mediaUrl = `https://api.twilio.com${rec.uri.replace(".json", "")}`;
+  log.success(`started call recording\n${mediaUrl}`);
 }
