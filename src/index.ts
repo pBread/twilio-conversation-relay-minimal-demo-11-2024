@@ -28,7 +28,7 @@ app.post("/incoming-call", async (req, res) => {
         <Response>
             <Connect>
                 <ConversationRelay 
-                  url="wss://${HOSTNAME}/convo-relay"
+                  url="wss://${HOSTNAME}/convo-relay/${CallSid}"
                   welcomeGreeting="${demo.greeting}"
                   welcomeGreetingInterruptible="true"
 
@@ -58,20 +58,21 @@ app.post("/call-status-update", async (req, res) => {
 /****************************************************
  Conversation Relay Websocket
 ****************************************************/
-app.ws("/convo-relay", (ws, req) => {
+app.ws("/convo-relay/:callSid", (ws, req) => {
   log.success("/convo-relay websocket established");
 
   twlo.setWs(ws);
+  twlo.setCallSid(req.params.callSid);
 
   twlo.onMessage("setup", (msg) => {
     log.debug("/convo-relay setup", msg);
 
-    twlo.setCallSid(msg.callSid);
     if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
   });
 
   twlo.onMessage("prompt", (msg) => {
     log.debug("/convo-relay prompt", msg);
+    if (!msg.last) return; // partial speech
   });
 
   twlo.onMessage("interrupt", (msg) => {
