@@ -61,8 +61,8 @@ app.post("/call-status-update", async (req, res) => {
 app.ws("/convo-relay/:callSid", (ws, req) => {
   log.success("/convo-relay websocket established");
 
-  twlo.setWs(ws);
   twlo.setCallSid(req.params.callSid);
+  twlo.setWs(ws);
 
   twlo.onMessage("setup", (msg) => {
     log.debug("/convo-relay setup", msg);
