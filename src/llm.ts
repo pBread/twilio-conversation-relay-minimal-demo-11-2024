@@ -25,20 +25,35 @@ class LLMEventEmitter extends EventEmitter {
     super.emit(event, ...args);
   on = <K extends keyof Events>(event: K, listener: Events[K]): this =>
     super.on(event, listener);
+
+  static reset = () => {
+    eventEmitter = new LLMEventEmitter();
+    on = eventEmitter.on;
+  };
 }
 
 interface Events {
   speech: (text: string) => void;
 }
 
-const eventEmitter = new LLMEventEmitter();
-export const on = eventEmitter.on;
+let eventEmitter = new LLMEventEmitter();
+export let on = eventEmitter.on;
+
+function resetEventEmitter() {
+  eventEmitter = new LLMEventEmitter();
+  on = eventEmitter.on;
+}
 
 /****************************************************
  Message Store
 ****************************************************/
-const msgMap = new Map<number | string, StoreMessage>();
+let msgMap = new Map<number | string, StoreMessage>();
 let idx = 0; // used as an id
+
+function resetStore() {
+  msgMap = new Map<number | string, StoreMessage>();
+  idx = 0;
+}
 
 export type StoreMessage =
   | AssistantMessage
@@ -55,23 +70,28 @@ interface StoreRecord {
   idx: number;
 }
 
+type MessageStatus = "active" | "finished" | "interrupted";
+
 interface AssistantMessage
   extends ChatCompletionAssistantMessageParam,
     StoreRecord {
-  isComplete: boolean;
-  finish_reason?:
+  finish_reason:
     | "tool_calls"
     | "function_call"
     | "length"
     | "stop"
-    | "content_filter";
+    | "content_filter"
+    | null;
+
+  status: MessageStatus;
 }
+
 function createAssistantMessage(
   id: string,
   payload: ChatCompletionAssistantMessageParam,
-  isComplete = false
+  status: MessageStatus = "active"
 ) {
-  let msg = { id, idx: idx++, isComplete, ...payload };
+  let msg = { id, idx: idx++, finish_reason: null, status, ...payload };
   msgMap.set(msg.id, msg);
 }
 
@@ -92,13 +112,6 @@ export function createUserMessage(content: string) {
   msgMap.set(msg.id, msg);
 
   return msg;
-}
-
-function appendContent(id: number | string, content: string) {
-  let msg = msgMap.get(id);
-  if (!msg) throw Error(`Attempted to append message that does not exist`);
-
-  msg.content = (msg.content || "") + content;
 }
 
 export const getAllMessages = () => [...msgMap.values()];
@@ -137,12 +150,18 @@ function cleanObj(obj: { [key: string]: any }) {
 /****************************************************
  Chat Completion Handling
 ****************************************************/
-let activeId: null | string;
 let stream: null | Stream<ChatCompletionChunk>; // this demo only supports one call at a time hence there is only one stream open at any time
 
-export async function abort() {
-  activeId = null;
+export function abort() {
   stream?.controller.abort();
+}
+
+export function interrupt(utteranceUntilInterrupt: string) {
+  const lastAssistantMessage = getAllMessages().find(
+    (msg) => msg.role === "assistant"
+  );
+
+  lastAssistantMessage?.finish_reason;
 }
 
 export async function doCompletion() {
@@ -159,29 +178,35 @@ export async function doCompletion() {
 
   log.debug("stream initialized");
 
-  let role: Roles | undefined;
+  let msg: StoreMessage | undefined;
 
   for await (const chunk of stream) {
     const choice = chunk.choices[0];
 
-    // is first chunk
-    if (!activeId) {
-      activeId = chunk.id;
-      role = choice.delta.role as Roles;
-
-      if (role === "assistant") {
-        log.info("assistant started speaking");
+    if (!msg) {
+      const role = choice.delta.role as Roles;
+      if (role === "assistant")
         createAssistantMessage(
-          activeId,
+          chunk.id,
           choice.delta as ChatCompletionAssistantMessageParam
         );
-      } else log.error(`unhandled delta for role ${role}`, choice.delta);
-    } else appendContent(activeId, choice.delta.content as string);
+      else log.error(`unhandled delta for role ${role}`, choice.delta);
+    }
 
-    if (role === "assistant" && choice.delta.content)
+    if (!msg) throw Error("Store message not found.");
+
+    switch (msg.role) {
+      case "assistant":
+        if (choice.delta.content)
+          msg.content = (msg.content || "") + choice.delta.content;
+
+        msg.finish_reason = choice.finish_reason;
+    }
+
+    if (msg.role === "assistant" && choice.delta.content)
       eventEmitter.emit("speech", choice.delta.content as string);
 
-    if (role !== "assistant")
+    if (msg.role !== "assistant")
       log.debug("stream chunk\n", JSON.stringify(chunk, null, 2));
 
     if (choice.finish_reason === "stop") {
@@ -189,6 +214,14 @@ export async function doCompletion() {
     }
   }
 
-  activeId = null;
   stream = null;
+}
+
+/****************************************************
+ Misc
+****************************************************/
+export function reset() {
+  resetEventEmitter();
+  resetStore();
+  abort();
 }

@@ -19,6 +19,8 @@ app.use(express.urlencoded({ extended: true })).use(express.json());
 app.post("/incoming-call", async (req, res) => {
   const { CallSid, From, To } = req.body;
   log.reset();
+  llm.reset();
+
   log.success(`/incoming-call From ${From} To ${To} CallSid ${CallSid}`);
 
   try {
