@@ -1,3 +1,4 @@
+import EventEmitter from "events";
 import OpenAI from "openai";
 import type {
   ChatCompletionAssistantMessageParam,
@@ -10,7 +11,6 @@ import type {
 import type { Stream } from "openai/streaming";
 import * as demo from "../demo";
 import * as log from "./logger";
-import EventEmitter from "events";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -55,6 +55,7 @@ interface StoreRecord {
 interface AssistantMessage
   extends ChatCompletionAssistantMessageParam,
     StoreRecord {
+  isComplete: boolean;
   finish_reason?:
     | "tool_calls"
     | "function_call"
@@ -64,13 +65,20 @@ interface AssistantMessage
 }
 function createAssistantMessage(
   id: string,
-  payload: ChatCompletionAssistantMessageParam
+  payload: ChatCompletionAssistantMessageParam,
+  isComplete = false
 ) {
-  let msg = { id, idx: idx++, ...payload };
-  msgMap.set(id, msg);
+  let msg = { id, idx: idx++, isComplete, ...payload };
+  msgMap.set(msg.id, msg);
 }
 
 interface SystemMessage extends ChatCompletionSystemMessageParam, StoreRecord {}
+export function createSystemMessage(content: string) {
+  const id = idx++;
+  let msg: SystemMessage = { id, idx: id, role: "system", content };
+
+  msgMap.set(msg.id, msg);
+}
 
 interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
 
@@ -158,12 +166,13 @@ export async function doCompletion() {
       activeId = chunk.id;
       role = choice.delta.role as Roles;
 
-      if (role === "assistant")
+      if (role === "assistant") {
+        log.info("assistant started speaking");
         createAssistantMessage(
           activeId,
           choice.delta as ChatCompletionAssistantMessageParam
         );
-      else log.error(`unhandled delta for role ${role}`, choice.delta);
+      } else log.error(`unhandled delta for role ${role}`, choice.delta);
     } else appendContent(activeId, choice.delta.content as string);
 
     if (role === "assistant" && choice.delta.content)
@@ -173,7 +182,7 @@ export async function doCompletion() {
       log.debug("stream chunk\n", JSON.stringify(chunk, null, 2));
 
     if (choice.finish_reason === "stop") {
-      log.debug("last chunk!", getAllMessages());
+      log.debug("last chunk!");
     }
   }
 

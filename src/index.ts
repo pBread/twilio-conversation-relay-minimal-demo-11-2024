@@ -60,20 +60,20 @@ app.post("/call-status-update", async (req, res) => {
  Conversation Relay Websocket
 ****************************************************/
 app.ws("/convo-relay/:callSid", (ws, req) => {
+  // initialization
   log.info("/convo-relay websocket initializing");
-
   twlo.setCallSid(req.params.callSid);
   twlo.setWs(ws);
 
   twlo.onMessage("setup", (msg) => {
     log.success(`/convo-relay websocket initialized`);
-
     if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
   });
 
-  // send LLM generated
+  // send LLM generated speech to Twilio TTS
   llm.on("speech", (text) => twlo.textToSpeech(text));
 
+  // send human speech to LLM
   twlo.onMessage("prompt", (msg) => {
     if (!msg.last) return; // partial speech
 
@@ -83,12 +83,13 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
     llm.doCompletion(); // initiates the completion loop
   });
 
+  // handle user interrupting LLM speech
   twlo.onMessage("interrupt", (msg) => {
     log.info(`human interruption`);
 
     log.debug("/convo-relay interrupt", msg);
 
-    llm.kill();
+    llm.kill(); //
   });
 
   twlo.onMessage("dtmf", (msg) => log.debug("dtmf", msg));
