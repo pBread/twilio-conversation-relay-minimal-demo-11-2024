@@ -91,7 +91,7 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
 
     log.debug("/convo-relay interrupt", msg);
 
-    llm.kill(); //
+    llm.abort(); // abort all open requests
   });
 
   twlo.onMessage("dtmf", (msg) => log.debug("dtmf", msg));

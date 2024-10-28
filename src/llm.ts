@@ -1,3 +1,4 @@
+import dotenv from "dotenv-flow";
 import EventEmitter from "events";
 import OpenAI from "openai";
 import type {
@@ -11,6 +12,8 @@ import type {
 import type { Stream } from "openai/streaming";
 import * as demo from "../demo";
 import * as log from "./logger";
+
+dotenv.config();
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -137,7 +140,7 @@ function cleanObj(obj: { [key: string]: any }) {
 let activeId: null | string;
 let stream: null | Stream<ChatCompletionChunk>; // this demo only supports one call at a time hence there is only one stream open at any time
 
-export async function kill() {
+export async function abort() {
   activeId = null;
   stream?.controller.abort();
 }
