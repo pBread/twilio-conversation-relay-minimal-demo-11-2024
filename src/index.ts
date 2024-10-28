@@ -4,6 +4,7 @@ import ExpressWs from "express-ws";
 import * as demo from "../demo";
 import * as log from "./logger";
 import * as twlo from "./twilio";
+import * as llm from "./llm";
 import type { CallStatus } from "./twilio-types";
 
 dotenv.config();
@@ -74,6 +75,9 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
     if (!msg.last) return; // partial speech
 
     log.info(`human speech complete \n${msg.voicePrompt}`);
+
+    llm.createUserMessage(msg.voicePrompt); // creates a message record in memory
+    llm.doCompletion(); // initiates the completion loop
   });
 
   twlo.onMessage("interrupt", (msg) => {
