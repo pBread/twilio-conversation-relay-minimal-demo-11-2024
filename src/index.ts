@@ -2,9 +2,9 @@ import dotenv from "dotenv-flow";
 import express from "express";
 import ExpressWs from "express-ws";
 import * as demo from "../demo";
+import * as llm from "./llm";
 import * as log from "./logger";
 import * as twlo from "./twilio";
-import * as llm from "./llm";
 import type { CallStatus } from "./twilio-types";
 
 dotenv.config();
@@ -52,6 +52,8 @@ app.post("/call-status-update", async (req, res) => {
 
   if (status === "error") log.error(msg);
   else log.info(msg);
+
+  log.debug(`llm message history`, llm.getAllMessages());
 
   res.status(200).send();
 });
