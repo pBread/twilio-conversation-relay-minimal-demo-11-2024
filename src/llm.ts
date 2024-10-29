@@ -68,6 +68,7 @@ type Roles = ExtractMessageRoles<StoreMessage>;
 interface StoreRecord {
   id: number | string;
   idx: number;
+  status: MessageStatus;
 }
 
 type MessageStatus = "active" | "finished" | "interrupted";
@@ -82,8 +83,6 @@ interface AssistantMessage
     | "stop"
     | "content_filter"
     | null;
-
-  status: MessageStatus;
 }
 
 function createAssistantMessage(
@@ -93,14 +92,22 @@ function createAssistantMessage(
 ) {
   let msg = { id, idx: idx++, finish_reason: null, status, ...payload };
   msgMap.set(msg.id, msg);
+  return msg;
 }
 
 interface SystemMessage extends ChatCompletionSystemMessageParam, StoreRecord {}
 export function createSystemMessage(content: string) {
   const id = idx++;
-  let msg: SystemMessage = { id, idx: id, role: "system", content };
+  let msg: SystemMessage = {
+    content,
+    id,
+    idx: id,
+    role: "system",
+    status: "finished",
+  };
 
   msgMap.set(msg.id, msg);
+  return msg;
 }
 
 interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
@@ -108,9 +115,15 @@ interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
 interface UserMessage extends ChatCompletionUserMessageParam, StoreRecord {}
 export function createUserMessage(content: string) {
   const id = idx++;
-  const msg: UserMessage = { id, idx: id, role: "user", content };
-  msgMap.set(msg.id, msg);
+  const msg: UserMessage = {
+    content,
+    id,
+    idx: id,
+    role: "user",
+    status: "finished", // user messages are only created after they are done speaking
+  };
 
+  msgMap.set(msg.id, msg);
   return msg;
 }
 
@@ -157,11 +170,17 @@ export function abort() {
 }
 
 export function interrupt(utteranceUntilInterrupt: string) {
-  const lastAssistantMessage = getAllMessages().find(
-    (msg) => msg.role === "assistant"
-  );
+  log.debug("interrupt", getAllMessages());
+  const msgs = getAllMessages().reverse();
 
-  lastAssistantMessage?.finish_reason;
+  const lastAssistantMessage = msgs.find((msg) => msg.role === "assistant");
+
+  if (lastAssistantMessage) {
+    lastAssistantMessage.status = "interrupted";
+    const curContent = lastAssistantMessage.content as string;
+    const [newContent] = curContent.split(utteranceUntilInterrupt);
+    lastAssistantMessage.content = newContent;
+  }
 }
 
 export async function doCompletion() {
@@ -186,7 +205,7 @@ export async function doCompletion() {
     if (!msg) {
       const role = choice.delta.role as Roles;
       if (role === "assistant")
-        createAssistantMessage(
+        msg = createAssistantMessage(
           chunk.id,
           choice.delta as ChatCompletionAssistantMessageParam
         );
@@ -201,6 +220,7 @@ export async function doCompletion() {
           msg.content = (msg.content || "") + choice.delta.content;
 
         msg.finish_reason = choice.finish_reason;
+        if (msg.finish_reason) msg.status = "finished";
     }
 
     if (msg.role === "assistant" && choice.delta.content)
