@@ -3,6 +3,7 @@ import express from "express";
 import ExpressWs from "express-ws";
 import * as demo from "../demo";
 import * as log from "./logger";
+import * as twlo from "./twilio";
 import type { CallStatus } from "./twilio-types";
 
 dotenv.config();
@@ -57,7 +58,26 @@ app.post("/call-status-update", async (req, res) => {
 /****************************************************
  Conversation Relay Websocket
 ****************************************************/
-app.ws("/convo-relay/:callSid", (ws, req) => {});
+app.ws("/convo-relay/:callSid", (ws, req) => {
+  const { callSid } = req.params;
+  log.info(`/convo-relay websocket initializing CallSid`);
+
+  // this demo only supports one call at a time hence some variables are global
+  twlo.setCallSid(callSid);
+  twlo.setWs(ws);
+
+  if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
+
+  // set initial state
+
+  //
+  twlo.onMessage("prompt", (msg) => {
+    if (!msg.last) return; // partial speech
+  });
+
+  // misc
+  twlo.onMessage("dtmf", (msg) => log.debug("dtmf", msg));
+});
 
 /****************************************************
  Start Server
