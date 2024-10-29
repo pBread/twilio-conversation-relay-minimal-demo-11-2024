@@ -1,1 +1,1 @@
-export const getCustomerProfile = ({}) => ({ name: "Roger" });
+export const getCustomerProfile = async ({}) => ({ name: "Roger" });
