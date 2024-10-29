@@ -85,12 +85,20 @@ interface AssistantMessage
     | null;
 }
 
-function createAssistantMessage(
+export function createAssistantMessage(
   id: string,
-  payload: ChatCompletionAssistantMessageParam,
+  payload: Omit<ChatCompletionAssistantMessageParam, "role">,
   status: MessageStatus = "active"
 ) {
-  let msg = { id, idx: idx++, finish_reason: null, status, ...payload };
+  let msg: AssistantMessage = {
+    finish_reason: null,
+    status,
+    ...payload,
+    role: "assistant",
+    id,
+    idx: idx++,
+  };
+
   msgMap.set(msg.id, msg);
   return msg;
 }
@@ -228,6 +236,9 @@ export async function doCompletion() {
 
     if (msg.role !== "assistant")
       log.debug("stream chunk\n", JSON.stringify(chunk, null, 2));
+
+    if (choice.finish_reason === "tool_calls") {
+    }
 
     if (choice.finish_reason === "stop") {
       log.debug("last chunk!");
