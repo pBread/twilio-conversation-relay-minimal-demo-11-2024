@@ -122,6 +122,25 @@ export function createSystemMessage(content: string) {
 // these messages are created after the tool call is complete.
 // tool execution requests are assistant messages
 interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
+let x: ToolMessage;
+
+function createToolMessage(
+  tool_call_id: string,
+  resultJsonStr: string,
+  status: MessageStatus = "finished"
+) {
+  const msg: ToolMessage = {
+    idx: idx++,
+    id: tool_call_id,
+    tool_call_id,
+    content: resultJsonStr,
+    role: "tool",
+    status,
+  };
+
+  msgMap.set(msg.id, msg);
+  return msg;
+}
 
 interface UserMessage extends ChatCompletionUserMessageParam, StoreRecord {}
 export function createUserMessage(content: string) {
@@ -235,7 +254,7 @@ export async function doCompletion() {
       log.debug("stream chunk\n", JSON.stringify(chunk, null, 2));
 
     if (msg.role === "assistant" && choice.finish_reason === "tool_calls")
-      await handleTools(msg);
+      handleTools(msg);
 
     if (choice.finish_reason === "stop") {
       log.debug("last chunk!");
@@ -252,10 +271,23 @@ async function handleTools(msg: AssistantMessage) {
   if (!msg.tool_calls?.length) return;
 
   const results = await Promise.allSettled(
-    msg.tool_calls.map(async (tool) => [tool, await executeFn(tool)])
+    msg.tool_calls.map(async (tool) => [tool.id, await executeFn(tool)])
   );
 
   log.debug("handleTools", JSON.stringify(results));
+
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      const [tool_call_id, data] = result.value;
+      createToolMessage(
+        tool_call_id as string,
+        JSON.stringify(data),
+        "finished"
+      );
+    }
+  }
+
+  doCompletion();
 }
 
 async function executeFn(tool: {
