@@ -75,6 +75,13 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
   twlo.onMessage("setup", (msg) => {
     log.success(`/convo-relay websocket initialized`);
     if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
+
+    llm.createSystemMessage(demo.openai.instructions);
+    llm.createAssistantMessage(
+      "greeting",
+      { content: demo.greeting },
+      "finished"
+    );
   });
 
   // send LLM generated speech to Twilio TTS
