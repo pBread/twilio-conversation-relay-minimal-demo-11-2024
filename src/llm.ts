@@ -11,8 +11,8 @@ import type {
 } from "openai/resources";
 import type { Stream } from "openai/streaming";
 import * as demo from "../demo";
-import * as log from "./logger";
 import * as fns from "../demo/functions";
+import * as log from "./logger";
 
 dotenv.config();
 
@@ -123,8 +123,6 @@ export function createSystemMessage(content: string) {
 // tool execution requests are assistant messages
 interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
 
-let x: ToolMessage;
-
 interface UserMessage extends ChatCompletionUserMessageParam, StoreRecord {}
 export function createUserMessage(content: string) {
   const id = idx++;
@@ -183,7 +181,6 @@ export function abort() {
 }
 
 export function interrupt(utteranceUntilInterrupt: string) {
-  log.debug("interrupt", getAllMessages());
   const msgs = getAllMessages().reverse();
 
   const lastAssistantMessage = msgs.find((msg) => msg.role === "assistant");

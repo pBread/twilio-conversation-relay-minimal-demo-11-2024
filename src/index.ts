@@ -101,8 +101,6 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
   twlo.onMessage("interrupt", (msg) => {
     log.info(`human interruption`);
 
-    log.debug("/convo-relay interrupt", msg);
-
     llm.abort(); // abort all open requests
     llm.interrupt(msg.utteranceUntilInterrupt);
   });
