@@ -1,3 +1,6 @@
+export * as functions from "./functions";
+export * as openai from "./openai";
+
 export const greeting = `Hello, this is Dave with Smalltown Gas and Electric. How I can help you today?`;
 
 /****************************************************
@@ -7,5 +10,3 @@ export const greeting = `Hello, this is Dave with Smalltown Gas and Electric. Ho
     Amazon Amy-Generative, Matthew-Generative, Ruth-Generative
 ****************************************************/
 export const tts = { voice: "en-US-Journey-D", provider: "google" };
-
-export * as openai from "./openai";

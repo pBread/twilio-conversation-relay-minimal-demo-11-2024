@@ -12,6 +12,7 @@ import type {
 import type { Stream } from "openai/streaming";
 import * as demo from "../demo";
 import * as log from "./logger";
+import * as fns from "../demo/functions";
 
 dotenv.config();
 
@@ -122,6 +123,8 @@ export function createSystemMessage(content: string) {
 // tool execution requests are assistant messages
 interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
 
+let x: ToolMessage;
+
 interface UserMessage extends ChatCompletionUserMessageParam, StoreRecord {}
 export function createUserMessage(content: string) {
   const id = idx++;
@@ -195,22 +198,19 @@ export function interrupt(utteranceUntilInterrupt: string) {
 export async function doCompletion() {
   if (stream) log.warn("doCompletion called when stream exists");
 
-  log.debug("stream initializing");
-
+  log.info("llm completion stream initializing");
   stream = await client.chat.completions.create({
     model: demo.openai.model || "gpt-4-1106-preview",
     messages: getAllMessages().map(toParam),
     stream: true,
     ...(demo.openai.tools.length ? { tools: demo.openai.tools } : {}), // openai api throws error if tools is empty array
   });
-
-  log.debug("stream initialized");
+  log.info("llm completion stream initialized");
 
   let msg: StoreMessage | undefined;
 
   for await (const chunk of stream) {
     const choice = chunk.choices[0];
-    log.debug("chunks", JSON.stringify(chunk, null, 2));
 
     if (!msg) {
       const role = choice.delta.role as Roles;
@@ -237,8 +237,8 @@ export async function doCompletion() {
     if (msg.role !== "assistant")
       log.debug("stream chunk\n", JSON.stringify(chunk, null, 2));
 
-    if (choice.finish_reason === "tool_calls") {
-    }
+    if (msg.role === "assistant" && choice.finish_reason === "tool_calls")
+      await handleTools(msg);
 
     if (choice.finish_reason === "stop") {
       log.debug("last chunk!");
@@ -246,6 +246,32 @@ export async function doCompletion() {
   }
 
   stream = null;
+}
+
+/****************************************************
+ Tool Execution
+****************************************************/
+async function handleTools(msg: AssistantMessage) {
+  if (!msg.tool_calls?.length) return;
+
+  const results = await Promise.allSettled(
+    msg.tool_calls.map(async (tool) => [tool, await executeFn(tool)])
+  );
+
+  log.debug("handleTools", JSON.stringify(results));
+}
+
+async function executeFn(tool: {
+  id: string;
+  function: { arguments: string; name: string };
+}) {
+  if (!(tool.function.name in fns))
+    throw Error(`Function not found: ${tool.function.name}`);
+
+  const args = JSON.parse(tool.function.arguments);
+  const fn = fns[tool.function.name as keyof typeof fns];
+
+  return fn(args);
 }
 
 /****************************************************
