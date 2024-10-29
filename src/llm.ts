@@ -110,6 +110,8 @@ export function createSystemMessage(content: string) {
   return msg;
 }
 
+// these messages are created after the tool call is complete.
+// tool execution requests are assistant messages
 interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
 
 interface UserMessage extends ChatCompletionUserMessageParam, StoreRecord {}
@@ -200,24 +202,23 @@ export async function doCompletion() {
 
   for await (const chunk of stream) {
     const choice = chunk.choices[0];
+    log.debug("chunks", JSON.stringify(chunk, null, 2));
 
     if (!msg) {
       const role = choice.delta.role as Roles;
+
       if (role === "assistant")
         msg = createAssistantMessage(
           chunk.id,
           choice.delta as ChatCompletionAssistantMessageParam
         );
       else log.error(`unhandled delta for role ${role}`, choice.delta);
-    }
+    } else mutateAppend(msg, choice.delta);
 
     if (!msg) throw Error("Store message not found.");
 
     switch (msg.role) {
       case "assistant":
-        if (choice.delta.content)
-          msg.content = (msg.content || "") + choice.delta.content;
-
         msg.finish_reason = choice.finish_reason;
         if (msg.finish_reason) msg.status = "finished";
     }
@@ -243,4 +244,34 @@ export function reset() {
   resetEventEmitter();
   resetStore();
   abort();
+}
+
+function mutateAppend<
+  T extends Record<string, any>,
+  U extends Record<string, any>
+>(obj1: T, obj2: U): T & U {
+  for (const key in obj2) {
+    if (typeof obj2[key] === "string" && typeof obj1[key] === "string") {
+      // Append if both values are strings
+      (obj1[key] as string) += obj2[key];
+    } else if (Array.isArray(obj2[key]) && Array.isArray(obj1[key])) {
+      // Handle arrays by merging objects within based on index
+      obj1[key] = obj2[key].map((item: any, index: number) => {
+        if (
+          typeof item === "object" &&
+          !Array.isArray(item) &&
+          obj1[key][index]
+        ) {
+          // Mutate the object at the same index
+          return mutateAppend(obj1[key][index], item);
+        }
+        return item;
+      }) as any;
+    } else {
+      // Otherwise, directly assign the value from obj2 to obj1, with assertion
+      (obj1 as any)[key] = obj2[key];
+    }
+  }
+
+  return obj1 as T & U;
 }

@@ -55,7 +55,10 @@ app.post("/call-status-update", async (req, res) => {
   if (status === "error") log.error(msg);
   else log.info(msg);
 
-  log.debug(`llm message history`, llm.getAllMessages());
+  log.debug(
+    `llm message history`,
+    JSON.stringify(llm.getAllMessages(), null, 2)
+  );
 
   res.status(200).send();
 });
