@@ -1,4 +1,4 @@
-export const greeting = `Hello, this is Dave with Copart. Is this Roger?`;
+export const greeting = `Hello, this is Dave with Smalltown Gas and Electric. How I can help you today?`;
 
 /****************************************************
  All of these voices: https://www.twilio.com/docs/voice/twiml/say/text-speech#available-voices-and-languages
