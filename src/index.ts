@@ -5,7 +5,7 @@ import * as demo from "../demo";
 import * as llm from "./llm";
 import * as log from "./logger";
 import * as twlo from "./twilio";
-import type { CallStatus } from "./twilio-types";
+import type { CallStatus, TwilioRelayMessage } from "./twilio-types";
 
 dotenv.config();
 const { HOSTNAME, PORT = "3000", RECORD_CALL } = process.env;
@@ -98,6 +98,11 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
   });
 
   twlo.onMessage("dtmf", (msg) => log.debug("dtmf", msg));
+
+  twlo.ws.on("message", (data) => {
+    const msg = JSON.parse(data.toString()) as TwilioRelayMessage;
+    log.debug("twlo.ws.on message", msg);
+  });
 });
 
 /****************************************************

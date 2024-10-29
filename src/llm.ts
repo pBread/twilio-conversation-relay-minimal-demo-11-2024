@@ -174,7 +174,6 @@ export function interrupt(utteranceUntilInterrupt: string) {
   const msgs = getAllMessages().reverse();
 
   const lastAssistantMessage = msgs.find((msg) => msg.role === "assistant");
-
   if (lastAssistantMessage) {
     lastAssistantMessage.status = "interrupted";
     const curContent = lastAssistantMessage.content as string;

@@ -1,13 +1,13 @@
 import dotenv from "dotenv-flow";
 import twilio from "twilio";
 import type { WebSocket } from "ws";
+import * as log from "./logger";
 import {
   EndSession,
   SendTextToken,
   TwilioRelayMessage,
   TwilioRelayMessageTypes,
 } from "./twilio-types";
-import * as log from "./logger";
 
 dotenv.config();
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
