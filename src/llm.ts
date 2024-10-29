@@ -273,11 +273,26 @@ function mutateAppend<
           !Array.isArray(item) &&
           obj1[key][index]
         ) {
-          // Mutate the object at the same index
+          // Recursively merge objects at the same index
           return mutateAppend(obj1[key][index], item);
+        } else if (Array.isArray(item) && Array.isArray(obj1[key][index])) {
+          // Handle nested arrays by merging items recursively
+          return item.map((nestedItem: any, nestedIndex: number) => {
+            if (
+              typeof nestedItem === "object" &&
+              !Array.isArray(nestedItem) &&
+              obj1[key][index][nestedIndex]
+            ) {
+              return mutateAppend(obj1[key][index][nestedIndex], nestedItem);
+            }
+            return nestedItem;
+          });
         }
         return item;
       }) as any;
+    } else if (typeof obj2[key] === "object" && typeof obj1[key] === "object") {
+      // If both are objects, merge them recursively
+      mutateAppend(obj1[key], obj2[key]);
     } else {
       // Otherwise, directly assign the value from obj2 to obj1, with assertion
       (obj1 as any)[key] = obj2[key];
