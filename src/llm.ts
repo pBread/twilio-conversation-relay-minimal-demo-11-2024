@@ -169,7 +169,7 @@ export function interrupt(utteranceUntilInterrupt: string) {
   interruptedMsg.content = newContent;
 
   log.info(
-    `msg content redacted to reflect interruption. new content:\n${newContent}`
+    `msg content redacted to reflect interruption.\nold content: ${curContent}\nnew content: ${newContent}`
   );
 
   // delete all of the assistant and tool messages created after the interruption

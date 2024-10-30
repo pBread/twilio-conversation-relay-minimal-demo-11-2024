@@ -96,8 +96,6 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
 
   twlo.onMessage("interrupt", (msg) => {
     log.info(`human interrupted bot at: ${msg.utteranceUntilInterrupt}`);
-
-    log.debug("interrupt", msg);
     llm.interrupt(msg.utteranceUntilInterrupt);
   });
 
