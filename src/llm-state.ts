@@ -17,6 +17,7 @@ export function reset() {
 reset();
 
 export const getMessages = () => [...msgMap.values()];
+export const getMessageParams = () => getMessages().map(toOpenAiParam);
 
 /****************************************************
  Entities
@@ -54,7 +55,7 @@ export interface UserMessage
 /****************************************************
  Translator
 ****************************************************/
-export function toOpenAiPrompt(msg: StoreMessage) {
+export function toOpenAiParam(msg: StoreMessage) {
   let params = { content: msg.content, role: msg.role };
 
   if (msg.role === "assistant")
