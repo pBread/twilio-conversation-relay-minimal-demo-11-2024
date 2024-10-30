@@ -2,8 +2,9 @@ import dotenv from "dotenv-flow";
 import express from "express";
 import ExpressWs from "express-ws";
 import * as demo from "../demo";
-import * as log from "./logger";
+import * as llm from "./llm";
 import * as state from "./llm-state";
+import * as log from "./logger";
 import * as twlo from "./twilio";
 import type { CallStatus } from "./twilio-types";
 
@@ -64,20 +65,28 @@ app.post("/call-status-update", async (req, res) => {
 ****************************************************/
 app.ws("/convo-relay/:callSid", (ws, req) => {
   const { callSid } = req.params;
-  log.info(`/convo-relay websocket initializing CallSid`);
-
   // this demo only supports one call at a time hence some variables are global
   twlo.setCallSid(callSid);
   twlo.setWs(ws);
+
+  log.info(`/convo-relay websocket initializing`);
+  twlo.onMessage("setup", () =>
+    log.success(`/convo-relay websocket initializing`)
+  );
 
   if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
   else log.warn("call is not being recorded");
 
   // set initial state
+  state.createSystemMessage(demo.openai.instructions);
+  state.createAssistantMessage("greeting", { content: demo.greeting });
 
-  //
+  // send human transcript to LLM
   twlo.onMessage("prompt", (msg) => {
-    if (!msg.last) return; // partial speech
+    if (!msg.last) return; // ignore partial speech
+
+    state.createUserMessage(msg.voicePrompt); // create the message record before starting the run
+    llm.startRun(); // the llm run will execute tools and generate text
   });
 
   // misc
