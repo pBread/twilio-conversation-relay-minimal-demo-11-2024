@@ -3,6 +3,7 @@ import express from "express";
 import ExpressWs from "express-ws";
 import * as demo from "../demo";
 import * as log from "./logger";
+import * as state from "./llm-state";
 import * as twlo from "./twilio";
 import type { CallStatus } from "./twilio-types";
 
@@ -18,6 +19,9 @@ app.use(express.urlencoded({ extended: true })).use(express.json());
 app.post("/incoming-call", async (req, res) => {
   try {
     // reset demo
+    log.reset();
+    state.reset();
+    twlo.reset();
 
     // respond with ConversationRelay TwiML
     const { CallSid, From, To } = req.body;

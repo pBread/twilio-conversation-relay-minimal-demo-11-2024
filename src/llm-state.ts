@@ -10,7 +10,7 @@ import { cleanObj } from "./util";
 let msgMap: Map<number | string, StoreMessage>;
 let idx: number = 0;
 
-function reset() {
+export function reset() {
   msgMap = new Map();
   idx = 0;
 }
