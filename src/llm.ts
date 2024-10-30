@@ -61,6 +61,7 @@ export async function startRun() {
   log.info("llm completion stream initialized");
 
   let msg: AssistantMessage | undefined;
+  let runAgain = false; // triggers a new completion to run after this one completes
 
   for await (const chunk of stream) {
     const choice = chunk.choices[0];
@@ -107,20 +108,21 @@ export async function startRun() {
         if ("error" in result) continue;
         state.createToolMessage(result.id, JSON.stringify(result.data));
       }
-      log.info(`tool calling complete`);
 
-      startRun();
+      log.info(`completed ${msg.tool_calls.length} tool executions`);
+      runAgain = true; // you must run a completion after executing tools
     }
   }
 
   stream = undefined;
+  if (runAgain) startRun();
 }
 
 async function executeFn(tool: ChatCompletionMessageToolCall) {
   const fnName = tool.function.name;
   try {
     log.info(
-      `tool execution starting. fn: ${fnName} args: ${tool.function.arguments}`
+      `tool execution starting. fn ${fnName}, args: ${tool.function.arguments}`
     );
 
     if (!(tool.function.name in fns))
@@ -130,7 +132,7 @@ async function executeFn(tool: ChatCompletionMessageToolCall) {
     const fn = fns[tool.function.name as keyof typeof fns];
 
     const data = await fn(args);
-    log.success(`tool execution complete: fn: ${fnName}`);
+    log.success(`tool execution complete: fn: ${fnName}`, data);
     return { ...tool, data };
   } catch (error) {
     log.error(`tool execution error. fn: ${fnName}, tool: `, tool);
