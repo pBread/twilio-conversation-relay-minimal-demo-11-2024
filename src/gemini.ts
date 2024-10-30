@@ -10,12 +10,19 @@ dotenv.config();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-let x: GenerateContentRequest;
-
 export async function startRun() {
-  const prompt = "Write a story about a magic backpack.";
+  let params: GenerateContentRequest = {
+    tools: [
+      {
+        functionDeclarations: [
+          { name: "getProfile", description: "Get user profile" },
+        ],
+      },
+    ],
+    contents: [{ role: "user", parts: [{ text: "What is my " }] }],
+  };
 
-  const result = await model.generateContentStream(prompt);
+  const result = await model.generateContentStream(params);
 
   // Print text as it comes in.
   for await (const chunk of result.stream) {
