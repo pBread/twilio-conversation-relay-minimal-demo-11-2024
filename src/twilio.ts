@@ -13,11 +13,19 @@ dotenv.config();
 const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
 export const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
-export let ws: WebSocket; // media stream websocket
+// this demo only supports one call at a time hence some variables are global
+export let callSid: string | undefined;
+export const setCallSid = (sid: string) => (callSid = sid);
+
+export let ws: WebSocket | undefined; // conversation relay websocket
 export const setWs = (wss: WebSocket) => (ws = wss);
 
-let callSid: string;
-export const setCallSid = (sid: string) => (callSid = sid);
+export function reset() {
+  callSid = undefined;
+
+  ws?.close();
+  ws?.on("close", () => (ws = undefined));
+}
 
 /****************************************************
  Conversation Relay Actions
@@ -28,12 +36,12 @@ export function endSession(handoffData: {}) {
     handoffData: JSON.stringify(handoffData),
   };
 
-  ws.send(JSON.stringify(action));
+  ws?.send(JSON.stringify(action));
 }
 
 export function textToSpeech(token: string, last: boolean = false) {
   const action: SendTextToken = { type: "text", token, last };
-  ws.send(JSON.stringify(action));
+  ws?.send(JSON.stringify(action));
 }
 /****************************************************
  Conversation Relay Message Listener
@@ -42,7 +50,7 @@ export function onMessage<T extends TwilioRelayMessageTypes>(
   type: T,
   callback: (message: TwilioRelayMessage & { type: T }) => void
 ) {
-  ws.on("message", (data) => {
+  ws?.on("message", (data) => {
     const msg = JSON.parse(data.toString()) as TwilioRelayMessage;
     if (msg.type === type) callback(msg as TwilioRelayMessage & { type: T });
   });
@@ -52,10 +60,7 @@ export function onMessage<T extends TwilioRelayMessageTypes>(
  Call Actions
 ****************************************************/
 export async function startCallRecording() {
-  const rec = await client.calls(callSid).recordings.create({
-    recordingStatusCallback: `https://${process.env.HOSTNAME}/recording-status`,
-    recordingStatusCallbackMethod: `POST`,
-  });
+  const rec = await client.calls(callSid as string).recordings.create();
 
   if (rec.errorCode)
     return log.error(

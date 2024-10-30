@@ -4,355 +4,183 @@ import OpenAI from "openai";
 import type {
   ChatCompletionAssistantMessageParam,
   ChatCompletionChunk,
-  ChatCompletionMessageParam,
-  ChatCompletionSystemMessageParam,
-  ChatCompletionToolMessageParam,
-  ChatCompletionUserMessageParam,
+  ChatCompletionMessageToolCall,
 } from "openai/resources";
-import type { Stream } from "openai/streaming";
+import { Stream } from "openai/streaming";
 import * as demo from "../demo";
 import * as fns from "../demo/functions";
+import type { AssistantMessage } from "./llm-state";
+import * as state from "./llm-state";
 import * as log from "./logger";
+import { mutateDeepmergeAppend } from "./util";
 
 dotenv.config();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let stream: Stream<ChatCompletionChunk> | undefined; // this demo only supports one call at a time hence there is only one stream open at any time
 
 /****************************************************
- LLM Events Emitter
+ LLM Events
 ****************************************************/
 class LLMEventEmitter extends EventEmitter {
   emit = <K extends keyof Events>(event: K, ...args: Parameters<Events[K]>) =>
     super.emit(event, ...args);
   on = <K extends keyof Events>(event: K, listener: Events[K]): this =>
     super.on(event, listener);
-
-  static reset = () => {
-    eventEmitter = new LLMEventEmitter();
-    on = eventEmitter.on;
-  };
 }
 
 interface Events {
-  speech: (text: string) => void;
+  speech: (text: string, isLast: boolean) => void;
 }
 
-let eventEmitter = new LLMEventEmitter();
-export let on = eventEmitter.on;
+const eventEmitter = new LLMEventEmitter();
+export const on = eventEmitter.on;
 
-function resetEventEmitter() {
-  eventEmitter = new LLMEventEmitter();
-  on = eventEmitter.on;
-}
-
-/****************************************************
- Message Store
-****************************************************/
-let msgMap = new Map<number | string, StoreMessage>();
-let idx = 0; // used as an id
-
-function resetStore() {
-  msgMap = new Map<number | string, StoreMessage>();
-  idx = 0;
-}
-
-export type StoreMessage =
-  | AssistantMessage
-  | SystemMessage
-  | ToolMessage
-  | UserMessage;
-
-type ExtractMessageRoles<T> = T extends { role: infer U } ? U : never;
-type Roles = ExtractMessageRoles<StoreMessage>;
-
-// properties shared with all message types
-interface StoreRecord {
-  id: number | string;
-  idx: number;
-  status: MessageStatus;
-}
-
-type MessageStatus = "active" | "finished" | "interrupted";
-
-interface AssistantMessage
-  extends ChatCompletionAssistantMessageParam,
-    StoreRecord {
-  finish_reason:
-    | "tool_calls"
-    | "function_call"
-    | "length"
-    | "stop"
-    | "content_filter"
-    | null;
-}
-
-export function createAssistantMessage(
-  id: string,
-  payload: Omit<ChatCompletionAssistantMessageParam, "role">,
-  status: MessageStatus = "active"
-) {
-  let msg: AssistantMessage = {
-    finish_reason: null,
-    status,
-    ...payload,
-    role: "assistant",
-    id,
-    idx: idx++,
-  };
-
-  msgMap.set(msg.id, msg);
-  return msg;
-}
-
-interface SystemMessage extends ChatCompletionSystemMessageParam, StoreRecord {}
-export function createSystemMessage(content: string) {
-  const id = idx++;
-  let msg: SystemMessage = {
-    content,
-    id,
-    idx: id,
-    role: "system",
-    status: "finished",
-  };
-
-  msgMap.set(msg.id, msg);
-  return msg;
-}
-
-// these messages are created after the tool call is complete.
-// tool execution requests are assistant messages
-interface ToolMessage extends ChatCompletionToolMessageParam, StoreRecord {}
-let x: ToolMessage;
-
-function createToolMessage(
-  tool_call_id: string,
-  resultJsonStr: string,
-  status: MessageStatus = "finished"
-) {
-  const msg: ToolMessage = {
-    idx: idx++,
-    id: tool_call_id,
-    tool_call_id,
-    content: resultJsonStr,
-    role: "tool",
-    status,
-  };
-
-  msgMap.set(msg.id, msg);
-  return msg;
-}
-
-interface UserMessage extends ChatCompletionUserMessageParam, StoreRecord {}
-export function createUserMessage(content: string) {
-  const id = idx++;
-  const msg: UserMessage = {
-    content,
-    id,
-    idx: id,
-    role: "user",
-    status: "finished", // user messages are only created after they are done speaking
-  };
-
-  msgMap.set(msg.id, msg);
-  return msg;
-}
-
-export const getAllMessages = () => [...msgMap.values()];
-
-/** translates store message to the format OpenAI expects  */
-function toParam(msg: StoreMessage) {
-  let param = { content: msg.content, role: msg.role };
-
-  if (msg.role === "assistant")
-    Object.assign(
-      param,
-      cleanObj({
-        audio: msg.audio,
-        name: msg.name,
-        refusal: msg.refusal,
-        tool_calls: msg.tool_calls,
-      })
-    );
-
-  if (msg.role === "system") Object.assign(param, cleanObj({ name: msg.name }));
-
-  if (msg.role === "tool")
-    Object.assign(param, cleanObj({ tool_call_id: msg.tool_call_id }));
-
-  if (msg.role === "user") Object.assign(param, cleanObj({ name: msg.name }));
-
-  return param as ChatCompletionMessageParam;
-}
-
-function cleanObj(obj: { [key: string]: any }) {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([_, value]) => value !== undefined)
-  );
+export function reset() {
+  stream = undefined;
 }
 
 /****************************************************
- Chat Completion Handling
+ Handle Completions
 ****************************************************/
-let stream: null | Stream<ChatCompletionChunk>; // this demo only supports one call at a time hence there is only one stream open at any time
+export async function startRun() {
+  if (stream) log.warn("started llm run but a stream already exists");
 
-export function abort() {
-  stream?.controller.abort();
-}
-
-export function interrupt(utteranceUntilInterrupt: string) {
-  const msgs = getAllMessages().reverse();
-
-  const lastAssistantMessage = msgs.find((msg) => msg.role === "assistant");
-  if (lastAssistantMessage) {
-    lastAssistantMessage.status = "interrupted";
-    const curContent = lastAssistantMessage.content as string;
-    const [newContent] = curContent.split(utteranceUntilInterrupt);
-    lastAssistantMessage.content = newContent;
-  }
-}
-
-export async function doCompletion() {
-  if (stream) log.warn("doCompletion called when stream exists");
-
-  log.info("llm completion stream initializing");
-  stream = await client.chat.completions.create({
+  log.info("new llm completion stream starting");
+  stream = await openai.chat.completions.create({
     model: demo.openai.model || "gpt-4-1106-preview",
-    messages: getAllMessages().map(toParam),
+    messages: state.getMessageParams(), // state messages must be translated to params for openai api
     stream: true,
     ...(demo.openai.tools.length ? { tools: demo.openai.tools } : {}), // openai api throws error if tools is empty array
   });
-  log.info("llm completion stream initialized");
 
-  let msg: StoreMessage | undefined;
+  let msg: AssistantMessage | undefined;
+  let runAgain = false; // triggers a new completion to run after this one completes
 
   for await (const chunk of stream) {
     const choice = chunk.choices[0];
 
+    // local msg is set on first chunk
     if (!msg) {
-      const role = choice.delta.role as Roles;
-
-      if (role === "assistant")
-        msg = createAssistantMessage(
-          chunk.id,
-          choice.delta as ChatCompletionAssistantMessageParam
-        );
-      else log.error(`unhandled delta for role ${role}`, choice.delta);
-    } else mutateAppend(msg, choice.delta);
-
-    if (!msg) throw Error("Store message not found.");
-
-    switch (msg.role) {
-      case "assistant":
-        msg.finish_reason = choice.finish_reason;
-        if (msg.finish_reason) msg.status = "finished";
-    }
-
-    if (msg.role === "assistant" && choice.delta.content)
-      eventEmitter.emit("speech", choice.delta.content as string);
-
-    if (msg.role !== "assistant")
-      log.debug("stream chunk\n", JSON.stringify(chunk, null, 2));
-
-    if (msg.role === "assistant" && choice.finish_reason === "tool_calls")
-      handleTools(msg);
-
-    if (choice.finish_reason === "stop") {
-      log.debug("last chunk!");
-    }
-  }
-
-  stream = null;
-}
-
-/****************************************************
- Tool Execution
-****************************************************/
-async function handleTools(msg: AssistantMessage) {
-  if (!msg.tool_calls?.length) return;
-
-  const results = await Promise.allSettled(
-    msg.tool_calls.map(async (tool) => [tool.id, await executeFn(tool)])
-  );
-
-  log.debug("handleTools", JSON.stringify(results));
-
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      const [tool_call_id, data] = result.value;
-      createToolMessage(
-        tool_call_id as string,
-        JSON.stringify(data),
-        "finished"
+      msg = state.createAssistantMessage(
+        chunk.id,
+        choice.delta as ChatCompletionAssistantMessageParam
       );
     }
-  }
+    // merge the chunk into the message
+    else mutateDeepmergeAppend(msg, choice.delta);
 
-  doCompletion();
-}
+    if (choice.delta.content)
+      eventEmitter.emit(
+        "speech",
+        choice.delta.content as string,
+        !!choice.finish_reason // finish_reason indicates this is last chunk
+      );
 
-async function executeFn(tool: {
-  id: string;
-  function: { arguments: string; name: string };
-}) {
-  if (!(tool.function.name in fns))
-    throw Error(`Function not found: ${tool.function.name}`);
+    if (choice.finish_reason === "content_filter")
+      log.error(`completion failed due to content_filter`);
 
-  const args = JSON.parse(tool.function.arguments);
-  const fn = fns[tool.function.name as keyof typeof fns];
+    if (choice.finish_reason === "length") {
+      log.warn(
+        `Llm completion stopped due to length. It's being restarted but you should update your prompt to get shorter content`
+      );
+      startRun();
+    }
 
-  return fn(args);
-}
+    if (choice.finish_reason === "stop")
+      log.info(`llm chat completion run complete`);
 
-/****************************************************
- Misc
-****************************************************/
-export function reset() {
-  resetEventEmitter();
-  resetStore();
-  abort();
-}
+    if (choice.finish_reason === "tool_calls") {
+      if (!msg.tool_calls?.length) {
+        log.error(
+          `assistant attempted to initate tool calls but not tool calls were defined`,
+          JSON.stringify(msg)
+        );
+        break;
+      }
 
-function mutateAppend<
-  T extends Record<string, any>,
-  U extends Record<string, any>
->(obj1: T, obj2: U): T & U {
-  for (const key in obj2) {
-    if (typeof obj2[key] === "string" && typeof obj1[key] === "string") {
-      // Append if both values are strings
-      (obj1[key] as string) += obj2[key];
-    } else if (Array.isArray(obj2[key]) && Array.isArray(obj1[key])) {
-      // Handle arrays by merging objects within based on index
-      obj1[key] = obj2[key].map((item: any, index: number) => {
-        if (
-          typeof item === "object" &&
-          !Array.isArray(item) &&
-          obj1[key][index]
-        ) {
-          // Recursively merge objects at the same index
-          return mutateAppend(obj1[key][index], item);
-        } else if (Array.isArray(item) && Array.isArray(obj1[key][index])) {
-          // Handle nested arrays by merging items recursively
-          return item.map((nestedItem: any, nestedIndex: number) => {
-            if (
-              typeof nestedItem === "object" &&
-              !Array.isArray(nestedItem) &&
-              obj1[key][index][nestedIndex]
-            ) {
-              return mutateAppend(obj1[key][index][nestedIndex], nestedItem);
-            }
-            return nestedItem;
-          });
-        }
-        return item;
-      }) as any;
-    } else if (typeof obj2[key] === "object" && typeof obj1[key] === "object") {
-      // If both are objects, merge them recursively
-      mutateAppend(obj1[key], obj2[key]);
-    } else {
-      // Otherwise, directly assign the value from obj2 to obj1, with assertion
-      (obj1 as any)[key] = obj2[key];
+      const results = await Promise.all(msg.tool_calls.map(executeFn));
+
+      for (const result of results) {
+        // todo: add error handling
+        if ("error" in result) continue;
+        state.createToolMessage(result.id, JSON.stringify(result.data));
+      }
+
+      runAgain = true; // you must run a completion after executing tools
     }
   }
 
-  return obj1 as T & U;
+  stream = undefined;
+  if (runAgain) startRun();
+}
+
+async function executeFn(tool: ChatCompletionMessageToolCall) {
+  const fnName = tool.function.name;
+  try {
+    log.info(
+      `tool execution starting: ${fnName}, args: ${tool.function.arguments}`
+    );
+
+    if (!(tool.function.name in fns))
+      throw Error(`Function not found: ${fnName}`);
+
+    const args = JSON.parse(tool.function.arguments);
+    const fn = fns[tool.function.name as keyof typeof fns];
+
+    const data = await fn(args);
+    log.success(`tool execution complete: ${fnName}, result: `, data);
+    return { ...tool, data };
+  } catch (error) {
+    log.error(`tool execution error. fn: ${fnName}, tool: `, tool);
+    return { ...tool, error };
+  }
+}
+
+/****************************************************
+ Interruptions
+****************************************************/
+export function abort() {
+  stream?.controller.abort();
+  stream = undefined;
+
+  // to do: async tools are not currently cancelled. this could lead to incoherent chat history if
+  // an async tool returns a value after cancellation.
+}
+
+export function interrupt(utteranceUntilInterrupt: string) {
+  abort();
+
+  const msgsReversed = state.getMessages().reverse();
+  const interruptedMsg = msgsReversed.find(
+    (msg) =>
+      typeof msg.content === "string" &&
+      msg.content?.includes(utteranceUntilInterrupt)
+  );
+
+  if (!interruptedMsg)
+    return log.warn(
+      `Could not find interrupted message. utteranceUntilInterrupt: ${utteranceUntilInterrupt}`
+    );
+
+  // redact content of interrupted message
+  const curContent = interruptedMsg.content as string;
+  const [newContent] = curContent.split(utteranceUntilInterrupt);
+  interruptedMsg.content = newContent;
+
+  log.info(
+    `msg content redacted to reflect interruption.\nold content: ${curContent}\nnew content: ${newContent}`
+  );
+
+  // delete all of the assistant and tool messages created after the interruption
+  // if these are not deleted, the bot will think it said things it didn't
+  msgsReversed
+    .filter((msg) => ["assistant", "tool"].includes(msg.role))
+    .filter((msg) => msg.idx > interruptedMsg.idx)
+    .forEach((msg) => {
+      log.info(`removing ${msg.role} msg (${msg.id}) from local state`);
+      state.deleteMsg(msg.id);
+    });
+
+  startRun();
 }

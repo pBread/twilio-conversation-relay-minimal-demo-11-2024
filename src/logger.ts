@@ -13,6 +13,7 @@ const COLORS = {
 let start = Date.now();
 let logPath: string;
 let logStream: fs.WriteStream;
+
 export function reset() {
   start = Date.now();
 
