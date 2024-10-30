@@ -16,6 +16,8 @@ export function reset() {
 }
 reset();
 
+export const getMessages = () => [...msgMap.values()];
+
 /****************************************************
  Entities
 ****************************************************/
