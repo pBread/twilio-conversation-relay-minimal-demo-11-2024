@@ -35,7 +35,7 @@ ngrok http 3000
 
 Then copy the domain
 
-<img src="./docs/grok.png"/>
+<img src="./scripts/grok.png"/>
 
 _Note: ngrok provides [static domains for all ngrok users](https://ngrok.com/blog-post/free-static-domains-ngrok-users). You can avoid updating the `HOSTNAME` every time by provisioning your own static domain._
 
