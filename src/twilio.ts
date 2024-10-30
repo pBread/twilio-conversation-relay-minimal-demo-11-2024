@@ -60,10 +60,7 @@ export function onMessage<T extends TwilioRelayMessageTypes>(
  Call Actions
 ****************************************************/
 export async function startCallRecording() {
-  const rec = await client.calls(callSid as string).recordings.create({
-    recordingStatusCallback: `https://${process.env.HOSTNAME}/recording-status`,
-    recordingStatusCallbackMethod: `POST`,
-  });
+  const rec = await client.calls(callSid as string).recordings.create();
 
   if (rec.errorCode)
     return log.error(

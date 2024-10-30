@@ -71,6 +71,7 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
   twlo.setWs(ws);
 
   if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
+  else log.warn("call is not being recorded");
 
   // set initial state
 
