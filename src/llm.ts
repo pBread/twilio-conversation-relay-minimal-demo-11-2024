@@ -1,7 +1,7 @@
 import dotenv from "dotenv-flow";
 import EventEmitter from "events";
 import OpenAI from "openai";
-import {
+import type {
   ChatCompletionAssistantMessageParam,
   ChatCompletionChunk,
   ChatCompletionMessageToolCall,
@@ -18,11 +18,6 @@ dotenv.config();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 let stream: Stream<ChatCompletionChunk> | undefined; // this demo only supports one call at a time hence there is only one stream open at any time
-
-export function abort() {
-  stream?.controller.abort();
-  stream = undefined;
-}
 
 /****************************************************
  LLM Events
@@ -140,4 +135,52 @@ async function executeFn(tool: ChatCompletionMessageToolCall) {
     log.error(`tool execution error. fn: ${fnName}, tool: `, tool);
     return { ...tool, error };
   }
+}
+
+/****************************************************
+ Interruptions
+****************************************************/
+export function abort() {
+  stream?.controller.abort();
+  stream = undefined;
+
+  // to do: async tools are not currently cancelled. this could lead to incoherent chat history if
+  // an async tool returns a value after cancellation.
+}
+
+export function interrupt(utteranceUntilInterrupt: string) {
+  abort();
+
+  const msgsReversed = state.getMessages().reverse();
+  const interruptedMsg = msgsReversed.find(
+    (msg) =>
+      typeof msg.content === "string" &&
+      msg.content?.includes(utteranceUntilInterrupt)
+  );
+
+  if (!interruptedMsg)
+    return log.warn(
+      `Could not find interrupted message. utteranceUntilInterrupt: ${utteranceUntilInterrupt}`
+    );
+
+  // redact content of interrupted message
+  const curContent = interruptedMsg.content as string;
+  const [newContent] = curContent.split(utteranceUntilInterrupt);
+  interruptedMsg.content = newContent;
+
+  log.info(
+    `msg content redacted to reflect interruption. new content:\n${newContent}`
+  );
+
+  // delete all of the assistant and tool messages created after the interruption
+  // if these are not deleted, the bot will think it said things it didn't
+  msgsReversed
+    .filter((msg) => ["assistant", "tool"].includes(msg.role))
+    .filter((msg) => msg.idx > interruptedMsg.idx)
+    .forEach((msg) => {
+      log.info(`removing ${msg.role} msg (${msg.id}) from local state`);
+      state.deleteMsg(msg.id);
+    });
+
+  startRun();
 }

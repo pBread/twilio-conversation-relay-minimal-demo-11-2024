@@ -16,6 +16,8 @@ export function reset() {
 }
 reset();
 
+export const deleteMsg = (id: number | string) => msgMap.delete(id);
+
 export const getMessages = () => [...msgMap.values()];
 export const getMessageParams = () => getMessages().map(toOpenAiParam);
 

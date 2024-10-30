@@ -91,7 +91,15 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
     llm.startRun(); // the llm run will execute tools and generate text
   });
 
+  // send bot text to Twilio to be played to the user
   llm.on("speech", (text, isLast) => twlo.textToSpeech(text, isLast));
+
+  twlo.onMessage("interrupt", (msg) => {
+    log.info(`human interrupted bot at: ${msg.utteranceUntilInterrupt}`);
+
+    log.debug("interrupt", msg);
+    llm.interrupt(msg.utteranceUntilInterrupt);
+  });
 
   // misc
   twlo.onMessage("dtmf", (msg) => log.debug("dtmf", msg));
