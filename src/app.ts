@@ -42,8 +42,8 @@ app.post("/incoming-call", async (req, res) => {
     </Connect>
 </Response>
 `);
-  } catch (err) {
-    log.error("/incoming-call webhook error", err);
+  } catch (error) {
+    log.error("/incoming-call webhook error", error);
     res.status(500).send();
   }
 });

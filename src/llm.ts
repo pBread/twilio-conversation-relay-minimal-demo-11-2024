@@ -4,10 +4,12 @@ import OpenAI from "openai";
 import {
   ChatCompletionAssistantMessageParam,
   ChatCompletionChunk,
+  ChatCompletionMessageToolCall,
 } from "openai/resources";
 import { Stream } from "openai/streaming";
 import * as demo from "../demo";
-import type { StoreMessage } from "./llm-state";
+import * as fns from "../demo/functions";
+import type { AssistantMessage } from "./llm-state";
 import * as state from "./llm-state";
 import * as log from "./logger";
 import { mutateDeepmergeAppend } from "./util";
@@ -58,7 +60,7 @@ export async function startRun() {
   });
   log.info("llm completion stream initialized");
 
-  let msg: StoreMessage | undefined;
+  let msg: AssistantMessage | undefined;
 
   for await (const chunk of stream) {
     const choice = chunk.choices[0];
@@ -72,5 +74,66 @@ export async function startRun() {
     }
     // merge the chunk into the message
     else mutateDeepmergeAppend(msg, choice.delta);
+
+    if (choice.delta.content)
+      eventEmitter.emit("speech", choice.delta.content as string);
+
+    if (choice.finish_reason === "content_filter")
+      log.error(`completion failed due to content_filter`);
+
+    if (choice.finish_reason === "length") {
+      log.warn(
+        `Llm completion stopped due to length. It's being restarted but you should update your prompt to get shorter content`
+      );
+      startRun();
+    }
+
+    if (choice.finish_reason === "stop")
+      log.info(`llm chat completion run complete`);
+
+    if (choice.finish_reason === "tool_calls") {
+      if (!msg.tool_calls?.length) {
+        log.error(
+          `assistant attempted to initate tool calls but not tool calls were defined`,
+          JSON.stringify(msg)
+        );
+        break;
+      }
+
+      const results = await Promise.all(msg.tool_calls.map(executeFn));
+
+      for (const result of results) {
+        // todo: add error handling
+        if ("error" in result) continue;
+        state.createToolMessage(result.id, JSON.stringify(result.data));
+      }
+      log.info(`tool calling complete`);
+
+      startRun();
+    }
+  }
+
+  stream = undefined;
+}
+
+async function executeFn(tool: ChatCompletionMessageToolCall) {
+  const fnName = tool.function.name;
+  try {
+    log.info(
+      `tool execution starting. fn: ${fnName} args: ${tool.function.arguments}`
+    );
+
+    if (!(tool.function.name in fns))
+      throw Error(`Function not found: ${fnName}`);
+
+    const args = JSON.parse(tool.function.arguments);
+    const fn = fns[tool.function.name as keyof typeof fns];
+
+    const data = await fn(args);
+    log.success(`tool execution complete: fn: ${fnName}`);
+    return { ...tool, data };
+  } catch (error) {
+    log.error(`tool execution error. fn: ${fnName}, tool: `, tool);
+    return { ...tool, error };
   }
 }
