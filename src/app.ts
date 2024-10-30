@@ -89,6 +89,8 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
     llm.startRun(); // the llm run will execute tools and generate text
   });
 
+  llm.on("speech", (text, isLast) => twlo.textToSpeech(text, isLast));
+
   // misc
   twlo.onMessage("dtmf", (msg) => log.debug("dtmf", msg));
 });

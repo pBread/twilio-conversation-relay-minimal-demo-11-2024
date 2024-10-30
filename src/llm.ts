@@ -35,7 +35,7 @@ class LLMEventEmitter extends EventEmitter {
 }
 
 interface Events {
-  speech: (text: string) => void;
+  speech: (text: string, isLast: boolean) => void;
 }
 
 const eventEmitter = new LLMEventEmitter();
@@ -51,14 +51,13 @@ export function reset() {
 export async function startRun() {
   if (stream) log.warn("started llm run but a stream already exists");
 
-  log.info("llm completion stream initializing");
+  log.info("llm completion stream starting");
   stream = await openai.chat.completions.create({
     model: demo.openai.model || "gpt-4-1106-preview",
     messages: state.getMessageParams(), // state messages must be translated to params for openai api
     stream: true,
     ...(demo.openai.tools.length ? { tools: demo.openai.tools } : {}), // openai api throws error if tools is empty array
   });
-  log.info("llm completion stream initialized");
 
   let msg: AssistantMessage | undefined;
   let runAgain = false; // triggers a new completion to run after this one completes
@@ -77,7 +76,11 @@ export async function startRun() {
     else mutateDeepmergeAppend(msg, choice.delta);
 
     if (choice.delta.content)
-      eventEmitter.emit("speech", choice.delta.content as string);
+      eventEmitter.emit(
+        "speech",
+        choice.delta.content as string,
+        !!choice.finish_reason // finish_reason indicates this is last chunk
+      );
 
     if (choice.finish_reason === "content_filter")
       log.error(`completion failed due to content_filter`);
