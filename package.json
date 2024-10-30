@@ -1,6 +1,6 @@
 {
   "author": "https://github.com/pBread",
-  "name": "twilio-conversation-relay-template",
+  "name": "twilio-conversation-relay-beta",
   "scripts": {
     "dev": "nodemon --exec 'ts-node src/app.ts' --ext 'ts,js,json' --watch 'demo' --watch 'src' ",
     "grok": "node scripts/ngrok.js",
