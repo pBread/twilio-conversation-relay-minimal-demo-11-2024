@@ -13,8 +13,8 @@ This project provides a simple working example of an LLM powered voice bot using
 ### 1. Clone Repo
 
 ```bash
-git clone https://github.com/pBread/twilio-openai-voicebot-simple
-cd twilio-openai-voicebot-simple
+git clone https://github.com/pBread/twilio-conversation-relay-beta.git
+cd twilio-conversation-relay-beta
 ```
 
 ### 2. Install Dependencies
