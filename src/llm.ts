@@ -9,6 +9,11 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 let stream: Stream<ChatCompletionChunk> | undefined; // this demo only supports one call at a time hence there is only one stream open at any time
 
+export function abort() {
+  stream?.controller.abort();
+  stream = undefined;
+}
+
 /****************************************************
  LLM Events
 ****************************************************/
@@ -34,4 +39,7 @@ export function reset() {
 }
 reset();
 
+/****************************************************
+ Handle Completions
+****************************************************/
 export function startRun() {}
