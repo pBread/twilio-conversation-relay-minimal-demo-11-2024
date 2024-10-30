@@ -51,7 +51,7 @@ export function reset() {
 export async function startRun() {
   if (stream) log.warn("started llm run but a stream already exists");
 
-  log.info("llm completion stream starting");
+  log.info("new llm completion stream starting");
   stream = await openai.chat.completions.create({
     model: demo.openai.model || "gpt-4-1106-preview",
     messages: state.getMessageParams(), // state messages must be translated to params for openai api
@@ -112,7 +112,6 @@ export async function startRun() {
         state.createToolMessage(result.id, JSON.stringify(result.data));
       }
 
-      log.info(`completed ${msg.tool_calls.length} tool executions`);
       runAgain = true; // you must run a completion after executing tools
     }
   }
@@ -125,7 +124,7 @@ async function executeFn(tool: ChatCompletionMessageToolCall) {
   const fnName = tool.function.name;
   try {
     log.info(
-      `tool execution starting. fn ${fnName}, args: ${tool.function.arguments}`
+      `tool execution starting: ${fnName}, args: ${tool.function.arguments}`
     );
 
     if (!(tool.function.name in fns))
@@ -135,7 +134,7 @@ async function executeFn(tool: ChatCompletionMessageToolCall) {
     const fn = fns[tool.function.name as keyof typeof fns];
 
     const data = await fn(args);
-    log.success(`tool execution complete: fn: ${fnName}`, data);
+    log.success(`tool execution complete: ${fnName}, result: `, data);
     return { ...tool, data };
   } catch (error) {
     log.error(`tool execution error. fn: ${fnName}, tool: `, tool);

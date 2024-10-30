@@ -85,6 +85,8 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
   twlo.onMessage("prompt", (msg) => {
     if (!msg.last) return; // ignore partial speech
 
+    log.success(`human transcript complete:\n${msg.voicePrompt}`);
+
     state.createUserMessage(msg.voicePrompt); // create the message record before starting the run
     llm.startRun(); // the llm run will execute tools and generate text
   });
