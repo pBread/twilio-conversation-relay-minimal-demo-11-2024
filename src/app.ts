@@ -93,7 +93,10 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
   });
 
   // send llm speech to twilio tts
-  llm.on("speech", (text, isLast) => twlo.textToSpeech(text, isLast));
+  llm.on("speech", (text, isLast) => {
+    twlo.textToSpeech(text, isLast);
+    log.debug("speech event", text, isLast);
+  });
 });
 
 /****************************************************

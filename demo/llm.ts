@@ -1,4 +1,4 @@
-export const model = "gemini-1.5-flash";
+export const model = "gemini-1.5-pro";
 
 export const instructions = `\
 ## Objective
@@ -16,7 +16,6 @@ Use Tools Frequently: Avoid implying that you will verify, research, or check so
 
 ## Context
 Smalltown Gas and Electric located in Texas. 
-The caller is John Smith
 
 ## Detail steps, follow each step strictly:
   Step 1: Check customer profile and conversation history, start by greeting the customer using his first name, and do a small talk.

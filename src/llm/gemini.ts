@@ -1,4 +1,5 @@
 import {
+  ChatSession,
   Content,
   FunctionCall,
   FunctionDeclaration,
@@ -68,6 +69,7 @@ function translateMessage(msg: state.StoreMessage): Content | undefined {
 }
 
 export async function startRun() {
+  let chat: ChatSession;
   // systemInstructions will be overriden by the latest system message
   let systemInstruction: string = demo.llm.instructions;
 
@@ -79,15 +81,15 @@ export async function startRun() {
     if (param) history.push(param);
   }
 
-  const message = history[0];
+  const message = history.shift();
   if (!message)
     throw Error(`Cannot start run because there are no messages in state`);
 
   const model = genAI.getGenerativeModel({
-    model: demo.llm.model || "gemini-1.5-flash",
+    model: demo.llm.model || "gemini-1.5-pro",
     systemInstruction,
   });
-  const chat = model.startChat({ history: history.reverse() });
+  chat = model.startChat({ history: history.reverse() });
 
   controller = new AbortController();
 
@@ -95,24 +97,22 @@ export async function startRun() {
 
   log.debug("history arg", JSON.stringify(history, null, 2));
   try {
-    const result = await chat.sendMessageStream(
-      message.parts[0].text as string,
-      { signal: controller.signal }
-    );
+    const result = await chat.sendMessageStream(message.parts, {
+      signal: controller.signal,
+    });
     // Print text as it comes in.
     for await (const chunk of result.stream) {
       const candidate = chunk?.candidates?.[0];
       const text = candidate?.content.parts?.[0]?.text;
+
+      if (text) eventEmitter.emit("speech", text, !!candidate.finishReason); // emit speech to twilio tts
 
       if (!msg) {
         if (text) msg = state.addAIMessage({ content: text, type: "text" });
         continue;
       }
 
-      if (msg.type === "text" && text) {
-        msg.content += text; // append message
-        eventEmitter.emit("speech", text, !!candidate.finishReason); // emit speech to twilio tts
-      }
+      if (msg.type === "text" && text) msg.content += text; // append message
 
       log.debug("chunk", JSON.stringify(chunk, null, 2));
     }
@@ -122,7 +122,14 @@ export async function startRun() {
 
   controller = undefined;
 
-  log.debug("history after", JSON.stringify(state.getMessages(), null, 2));
+  log.debug(
+    "state messages after",
+    JSON.stringify(state.getMessages(), null, 2)
+  );
+  log.debug(
+    "chat message after",
+    JSON.stringify(await chat.getHistory(), null, 2)
+  );
 }
 
 export function abort() {
