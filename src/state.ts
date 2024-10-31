@@ -29,7 +29,7 @@ interface StoreRecord {
 export interface AIMessage extends StoreRecord {
   content: string; // either text for speech or stringified json payload for tools
   role: "ai";
-  type: "content" | "tool";
+  type: "text" | "tool";
 }
 
 type CreateAIMessage = Omit<AIMessage, "id" | "idx" | "role">;
@@ -60,7 +60,7 @@ type CreateToolResultMessage = Omit<ToolResultMessage, "id" | "idx" | "role">;
 /****************************************************
  Record Creators
 ****************************************************/
-export function createAIMessage(params: CreateAIMessage) {
+export function addAIMessage(params: CreateAIMessage) {
   const id = ++idx;
   let msg: AIMessage = { id, idx, ...params, role: "ai" };
   msgStore.set(msg.id, msg);
@@ -68,7 +68,7 @@ export function createAIMessage(params: CreateAIMessage) {
   return msg;
 }
 
-export function createHumanMessage(params: CreateHumanMessage) {
+export function addHumanMessage(params: CreateHumanMessage) {
   const id = ++idx;
   let msg: HumanMessage = { id, idx, ...params, role: "human" };
   msgStore.set(msg.id, msg);
@@ -76,7 +76,7 @@ export function createHumanMessage(params: CreateHumanMessage) {
   return msg;
 }
 
-export function createSystemMessage(params: CreateSystemMessage) {
+export function addSystemMessage(params: CreateSystemMessage) {
   const id = ++idx;
   let msg: SystemMessage = { id, idx, ...params, role: "system" };
   msgStore.set(msg.id, msg);
@@ -84,7 +84,7 @@ export function createSystemMessage(params: CreateSystemMessage) {
   return msg;
 }
 
-export function createToolResultMessage(params: CreateToolResultMessage) {
+export function addToolResultMessage(params: CreateToolResultMessage) {
   const id = ++idx;
   let msg: ToolResultMessage = { id, idx, ...params, role: "tool" };
   msgStore.set(msg.id, msg);

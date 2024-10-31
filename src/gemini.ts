@@ -37,7 +37,7 @@ function translateMessage(msg: state.StoreMessage): Content | undefined {
   // and all previous system messages
   if (msg.role === "system") return;
 
-  if (msg.role === "ai" && msg.type === "content") {
+  if (msg.role === "ai" && msg.type === "text") {
     param = {
       role: "model",
       parts: [{ text: msg.content }],
