@@ -6,10 +6,10 @@ import {
   GoogleGenerativeAI,
 } from "@google/generative-ai";
 import dotenv from "dotenv-flow";
-import * as demo from "../demo";
-import * as fns from "../demo/functions";
-import * as log from "./logger";
-import * as state from "./state";
+import * as demo from "../../demo";
+import * as fns from "../../demo/functions";
+import * as log from "../logger";
+import * as state from "../state";
 
 dotenv.config();
 

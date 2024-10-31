@@ -2,10 +2,10 @@ import dotenv from "dotenv-flow";
 import express from "express";
 import ExpressWs from "express-ws";
 import * as demo from "../demo";
+import * as llm from "./llm/gemini";
 import * as log from "./logger";
 import * as state from "./state";
 import * as twlo from "./twilio";
-import * as llm from "./gemini";
 import type { CallStatus } from "./twilio-types";
 
 dotenv.config();
