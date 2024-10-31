@@ -9,6 +9,7 @@ import dotenv from "dotenv-flow";
 import * as demo from "../../demo";
 import * as fns from "../../demo/functions";
 import * as log from "../logger";
+import type { AIMessage } from "../state";
 import * as state from "../state";
 
 dotenv.config();
@@ -86,6 +87,9 @@ export async function startRun() {
 
   controller = new AbortController();
 
+  let msg: AIMessage | undefined;
+
+  log.debug("history arg", JSON.stringify(history, null, 2));
   try {
     const result = await chat.sendMessageStream(
       message.parts[0].text as string,
@@ -93,17 +97,25 @@ export async function startRun() {
     );
     // Print text as it comes in.
     for await (const chunk of result.stream) {
+      const condidate = chunk?.candidates?.[0];
+      const text = condidate?.content.parts?.[0]?.text;
+
+      if (!msg) {
+        if (text) msg = state.addAIMessage({ content: text, type: "text" });
+        continue;
+      }
+
+      if (msg.type === "text" && text) msg.content += text;
+
       log.debug("chunk", JSON.stringify(chunk, null, 2));
-      const chunkText = chunk.text();
-      process.stdout.write(chunkText);
     }
   } catch (error) {
     log.error(`error creating stream`, error);
-    //@ts-ignore
-    log.error(`errorDetails`, JSON.stringify(error?.errorDetails, null, 2));
   }
 
   controller = undefined;
+
+  log.debug("history after", JSON.stringify(state.getMessages(), null, 2));
 }
 
 export function abort() {
