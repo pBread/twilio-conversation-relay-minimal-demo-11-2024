@@ -1,5 +1,5 @@
 export * as functions from "./functions";
-export * as openai from "./openai";
+export * as llm from "./llm";
 
 export const greeting = `Hello, this is Dave with Smalltown Gas and Electric. How can I help you today?`;
 

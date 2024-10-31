@@ -1,19 +1,6 @@
-import type { ChatCompletionTool, ChatModel } from "openai/resources";
+export const model = "";
 
-export const model: ChatModel = "gpt-4-1106-preview";
-
-export const tools: ChatCompletionTool[] = [
-  {
-    type: "function",
-    function: {
-      name: "getCustomerProfile",
-      description: "Get the profile of the customer who is calling",
-      parameters: {},
-    },
-  },
-];
-
-export const instructions = `
+export const prompt = `\
 ## Objective
 You are a voice Smalltown Gas and Electric AI agent assisting users with inquiries about their Utility services. Your primary tasks include informing them about power outages change of address, billing information and answering common questions about the Electric Services. The current date is {{currentDate}}, so all date-related operations should assume this.
 
