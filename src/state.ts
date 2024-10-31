@@ -35,12 +35,14 @@ export interface AIMessage extends StoreRecord {
 type CreateAIMessage = Omit<AIMessage, "id" | "idx" | "role">;
 
 export interface HumanMessage extends StoreRecord {
+  content: string;
   role: "human";
 }
 
 type CreateHumanMessage = Omit<HumanMessage, "id" | "idx" | "role">;
 
 export interface SystemMessage extends StoreRecord {
+  content: string;
   role: "system";
 }
 
@@ -48,6 +50,7 @@ type CreateSystemMessage = Omit<SystemMessage, "id" | "idx" | "role">;
 
 // tool executions have two messages: AIMessage represents the tool initiation, ToolResultMessage represents the result
 export interface ToolResultMessage extends StoreRecord {
+  content: string; // stringified result
   parentId: string;
   role: "tool";
 }
