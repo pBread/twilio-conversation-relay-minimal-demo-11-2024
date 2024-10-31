@@ -1,4 +1,4 @@
-export const model = "";
+export const model = "gemini-1.5-flash";
 
 export const prompt = `\
 ## Objective
