@@ -69,6 +69,9 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
   twlo.setCallSid(callSid);
   twlo.setWs(ws);
 
+  state.addSystemMessage({ content: demo.llm.instructions });
+  state.addAIMessage({ content: demo.greeting, type: "text" });
+
   log.info(`/convo-relay websocket initializing`);
   twlo.onMessage("setup", () =>
     log.success(`/convo-relay websocket initializing`)
