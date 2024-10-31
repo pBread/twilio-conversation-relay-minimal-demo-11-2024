@@ -71,7 +71,7 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
 
   // add initial chat state
   state.addSystemMessage({ content: demo.llm.instructions });
-  state.addAIMessage({ content: demo.greeting, type: "text" });
+  // state.addAIMessage({ content: demo.greeting, type: "text" });
 
   if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
   else log.warn("call is not being recorded");
