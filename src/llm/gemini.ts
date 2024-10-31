@@ -4,14 +4,12 @@ import {
   FunctionDeclaration,
   FunctionResponse,
   GoogleGenerativeAI,
-  GoogleGenerativeAIError,
 } from "@google/generative-ai";
 import dotenv from "dotenv-flow";
 import * as demo from "../../demo";
 import * as fns from "../../demo/functions";
 import * as log from "../logger";
 import * as state from "../state";
-let x: GoogleGenerativeAIError;
 
 dotenv.config();
 
