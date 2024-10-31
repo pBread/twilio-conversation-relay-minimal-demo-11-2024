@@ -4,12 +4,14 @@ import {
   FunctionDeclaration,
   FunctionResponse,
   GoogleGenerativeAI,
+  GoogleGenerativeAIError,
 } from "@google/generative-ai";
 import dotenv from "dotenv-flow";
 import * as demo from "../../demo";
 import * as fns from "../../demo/functions";
 import * as log from "../logger";
 import * as state from "../state";
+let x: GoogleGenerativeAIError;
 
 dotenv.config();
 
@@ -17,9 +19,6 @@ dotenv.config();
 let controller: AbortController | undefined;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
-const model = genAI.getGenerativeModel({
-  model: demo.llm.model || "gemini-1.5-flash",
-});
 
 let functionDeclarations: FunctionDeclaration[] = [];
 for (const [name, fn] of Object.entries(fns))
@@ -77,22 +76,33 @@ export async function startRun() {
     if (param) history.push(param);
   }
 
-  const message = history.pop();
+  const message = history[0];
   if (!message)
     throw Error(`Cannot start run because there are no messages in state`);
 
-  const chat = model.startChat({ history, systemInstruction });
+  const model = genAI.getGenerativeModel({
+    model: demo.llm.model || "gemini-1.5-flash",
+    systemInstruction,
+  });
+  const chat = model.startChat({ history: history.reverse() });
+
   controller = new AbortController();
 
-  const result = await chat.sendMessageStream(message.parts, {
-    signal: controller.signal,
-  });
-
-  // Print text as it comes in.
-  for await (const chunk of result.stream) {
-    log.debug("chunk", JSON.stringify(chunk, null, 2));
-    const chunkText = chunk.text();
-    process.stdout.write(chunkText);
+  try {
+    const result = await chat.sendMessageStream(
+      message.parts[0].text as string,
+      { signal: controller.signal }
+    );
+    // Print text as it comes in.
+    for await (const chunk of result.stream) {
+      log.debug("chunk", JSON.stringify(chunk, null, 2));
+      const chunkText = chunk.text();
+      process.stdout.write(chunkText);
+    }
+  } catch (error) {
+    log.error(`error creating stream`, error);
+    //@ts-ignore
+    log.error(`errorDetails`, JSON.stringify(error?.errorDetails, null, 2));
   }
 
   controller = undefined;
