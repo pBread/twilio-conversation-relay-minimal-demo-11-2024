@@ -3,8 +3,11 @@ import {
   Content,
   FunctionCall,
   FunctionDeclaration,
+  FunctionDeclarationsTool,
   FunctionResponse,
   GoogleGenerativeAI,
+  StartChatParams,
+  Tool,
 } from "@google/generative-ai";
 import dotenv from "dotenv-flow";
 import * as demo from "../../demo";
@@ -28,7 +31,7 @@ let functionDeclarations: FunctionDeclaration[] = [];
 for (const [name, fn] of Object.entries(fns))
   functionDeclarations.push({
     name: name,
-    parameters: fn.parameters,
+    // parameters: fn.parameters,
     description: fn.description,
   });
 
@@ -89,13 +92,20 @@ export async function startRun() {
     model: demo.llm.model || "gemini-1.5-pro",
     systemInstruction,
   });
-  chat = model.startChat({ history: history.reverse() });
+  chat = model.startChat({
+    history: history.reverse(),
+    tools: [{ functionDeclarations }],
+  });
 
   controller = new AbortController();
 
   let msg: AIMessage | undefined;
 
   log.debug("history arg", JSON.stringify(history, null, 2));
+
+  // const result = await chat.sendMessage(message.parts);
+  // log.debug("result", JSON.stringify(result, null, 2));
+
   try {
     const result = await chat.sendMessageStream(message.parts, {
       signal: controller.signal,

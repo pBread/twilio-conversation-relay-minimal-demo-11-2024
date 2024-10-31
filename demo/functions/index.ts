@@ -5,6 +5,6 @@ export * from "./getCustomerProfile";
 export interface ToolFunction {
   (args: {}): Promise<{}>;
 
-  description: string;
-  parameters: FunctionDeclarationSchema;
+  description?: string;
+  parameters?: FunctionDeclarationSchema;
 }
