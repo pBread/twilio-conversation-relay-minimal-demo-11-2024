@@ -11,8 +11,12 @@ import * as fns from "../../demo/functions";
 import * as log from "../logger";
 import type { AIMessage } from "../state";
 import * as state from "../state";
+import { LLMEventEmitter } from "./interface";
 
 dotenv.config();
+
+let eventEmitter = new LLMEventEmitter();
+export let on = eventEmitter.on;
 
 // only one stream can be open at a time
 let controller: AbortController | undefined;
@@ -97,15 +101,18 @@ export async function startRun() {
     );
     // Print text as it comes in.
     for await (const chunk of result.stream) {
-      const condidate = chunk?.candidates?.[0];
-      const text = condidate?.content.parts?.[0]?.text;
+      const candidate = chunk?.candidates?.[0];
+      const text = candidate?.content.parts?.[0]?.text;
 
       if (!msg) {
         if (text) msg = state.addAIMessage({ content: text, type: "text" });
         continue;
       }
 
-      if (msg.type === "text" && text) msg.content += text;
+      if (msg.type === "text" && text) {
+        msg.content += text; // append message
+        eventEmitter.emit("speech", text, !!candidate.finishReason); // emit speech to twilio tts
+      }
 
       log.debug("chunk", JSON.stringify(chunk, null, 2));
     }
@@ -126,4 +133,7 @@ export function abort() {
 
 export function reset() {
   abort();
+
+  eventEmitter = new LLMEventEmitter();
+  on = eventEmitter.on;
 }

@@ -82,7 +82,7 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
     log.success(`/convo-relay websocket initializing`)
   );
 
-  // send human transcript to LLM
+  // send human transcript to llm
   twlo.onMessage("prompt", (msg) => {
     if (!msg.last) return; // ignore partial speech
 
@@ -92,7 +92,8 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
     llm.startRun(); // the llm run will execute tools and generate text
   });
 
-  //
+  // send llm speech to twilio tts
+  llm.on("speech", (text, isLast) => twlo.textToSpeech(text, isLast));
 });
 
 /****************************************************
