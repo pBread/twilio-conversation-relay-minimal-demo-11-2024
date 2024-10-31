@@ -72,6 +72,7 @@ function translateMessage(msg: state.StoreMessage): Content | undefined {
 }
 
 export async function startRun() {
+  let runAgain = false;
   let chat: ChatSession;
   // systemInstructions will be overriden by the latest system message
   let systemInstruction: string = demo.llm.instructions;
@@ -84,8 +85,8 @@ export async function startRun() {
     if (param) history.push(param);
   }
 
-  const message = history.shift();
-  if (!message)
+  const prompt = history.shift();
+  if (!prompt)
     throw Error(`Cannot start run because there are no messages in state`);
 
   const model = genAI.getGenerativeModel({
@@ -99,38 +100,53 @@ export async function startRun() {
 
   controller = new AbortController();
 
-  let msg: AIMessage | undefined;
-
   log.debug("history arg", JSON.stringify(history, null, 2));
 
-  // const result = await chat.sendMessage(message.parts);
-  // log.debug("result", JSON.stringify(result, null, 2));
-
   try {
-    const result = await chat.sendMessageStream(message.parts, {
-      signal: controller.signal,
-    });
-    // Print text as it comes in.
-    for await (const chunk of result.stream) {
-      const candidate = chunk?.candidates?.[0];
-      const text = candidate?.content.parts?.[0]?.text;
+    // gemini's streaming API doesn't support streaming hence using the REST API
+    const result = await chat.sendMessage(prompt.parts);
+    log.debug("result", JSON.stringify(result, null, 2));
+    const candidate = result.response?.candidates?.[0];
 
-      if (text) eventEmitter.emit("speech", text, !!candidate.finishReason); // emit speech to twilio tts
+    const fnCall = candidate?.content.parts?.[0]?.functionCall;
+    const text = candidate?.content.parts?.[0]?.text;
 
-      if (!msg) {
-        if (text) msg = state.addAIMessage({ content: text, type: "text" });
-        continue;
-      }
+    if (fnCall) {
+      const toolMsg = state.addAIMessage({
+        content: JSON.stringify(fnCall),
+        type: "tool",
+      });
+      const fn = fns[fnCall.name as keyof typeof fns];
+      if (!fn) log.error(`function not found. name: ${fnCall.name}`);
+      runAgain = true;
 
-      if (msg.type === "text" && text) msg.content += text; // append message
+      const response = await fn(fnCall.args);
+      log.info(`function result`, response);
 
-      log.debug("chunk", JSON.stringify(chunk, null, 2));
+      state.addToolResultMessage({
+        content: JSON.stringify(response),
+        parentId: toolMsg.id,
+      });
+
+      const fnResult = await chat.sendMessage([
+        { functionResponse: { name: fnCall.name, response } },
+      ]);
+      const txt = fnResult.response?.candidates?.[0].content.parts[0]
+        .text as string;
+      state.addAIMessage({ content: txt, type: "text" });
+      eventEmitter.emit("speech", txt, !!candidate.finishReason);
+    }
+
+    if (text) {
+      state.addAIMessage({ content: text, type: "text" });
+      eventEmitter.emit("speech", text, !!candidate.finishReason);
     }
   } catch (error) {
-    log.error(`error creating stream`, error);
+    log.error(`error in gemini completion request`, error);
   }
 
   controller = undefined;
+  // if (runAgain) startRun();
 
   log.debug(
     "state messages after",

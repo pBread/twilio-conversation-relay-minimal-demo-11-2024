@@ -51,7 +51,7 @@ type AddSystemMessage = Omit<SystemMessage, "id" | "idx" | "role">;
 // tool executions have two messages: AIMessage represents the tool initiation, ToolResultMessage represents the result
 export interface ToolResultMessage extends StoreRecord {
   content: string; // stringified result
-  parentId: string;
+  parentId: number | string;
   role: "tool";
 }
 
