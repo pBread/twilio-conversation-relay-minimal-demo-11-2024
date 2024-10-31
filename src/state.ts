@@ -14,7 +14,11 @@ export const getMessages = () => [...msgStore.values()];
 /****************************************************
  Entities
 ****************************************************/
-export type StoreMessage = {};
+export type StoreMessage =
+  | AIMessage
+  | HumanMessage
+  | SystemMessage
+  | ToolResultMessage;
 
 interface StoreRecord {
   id: number | string;
@@ -34,20 +38,21 @@ export interface HumanMessage extends StoreRecord {
   role: "human";
 }
 
-type CreateHumanMessage = Omit<AIMessage, "id" | "idx" | "role">;
+type CreateHumanMessage = Omit<HumanMessage, "id" | "idx" | "role">;
 
 export interface SystemMessage extends StoreRecord {
   role: "system";
 }
 
-type CreateSystemMessage = Omit<AIMessage, "id" | "idx" | "role">;
+type CreateSystemMessage = Omit<SystemMessage, "id" | "idx" | "role">;
 
 // tool executions have two messages: AIMessage represents the tool initiation, ToolResultMessage represents the result
 export interface ToolResultMessage extends StoreRecord {
+  parentId: string;
   role: "tool";
 }
 
-type CreateToolResultMessage = Omit<AIMessage, "id" | "idx" | "role">;
+type CreateToolResultMessage = Omit<ToolResultMessage, "id" | "idx" | "role">;
 
 /****************************************************
  Record Creators
