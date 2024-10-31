@@ -32,21 +32,21 @@ export interface AIMessage extends StoreRecord {
   type: "text" | "tool";
 }
 
-type CreateAIMessage = Omit<AIMessage, "id" | "idx" | "role">;
+type AddAIMessage = Omit<AIMessage, "id" | "idx" | "role">;
 
 export interface HumanMessage extends StoreRecord {
   content: string;
   role: "human";
 }
 
-type CreateHumanMessage = Omit<HumanMessage, "id" | "idx" | "role">;
+type AddHumanMessage = Omit<HumanMessage, "id" | "idx" | "role">;
 
 export interface SystemMessage extends StoreRecord {
   content: string;
   role: "system";
 }
 
-type CreateSystemMessage = Omit<SystemMessage, "id" | "idx" | "role">;
+type AddSystemMessage = Omit<SystemMessage, "id" | "idx" | "role">;
 
 // tool executions have two messages: AIMessage represents the tool initiation, ToolResultMessage represents the result
 export interface ToolResultMessage extends StoreRecord {
@@ -55,12 +55,12 @@ export interface ToolResultMessage extends StoreRecord {
   role: "tool";
 }
 
-type CreateToolResultMessage = Omit<ToolResultMessage, "id" | "idx" | "role">;
+type AddToolResultMessage = Omit<ToolResultMessage, "id" | "idx" | "role">;
 
 /****************************************************
  Record Creators
 ****************************************************/
-export function addAIMessage(params: CreateAIMessage) {
+export function addAIMessage(params: AddAIMessage) {
   const id = ++idx;
   let msg: AIMessage = { id, idx, ...params, role: "ai" };
   msgStore.set(msg.id, msg);
@@ -68,7 +68,7 @@ export function addAIMessage(params: CreateAIMessage) {
   return msg;
 }
 
-export function addHumanMessage(params: CreateHumanMessage) {
+export function addHumanMessage(params: AddHumanMessage) {
   const id = ++idx;
   let msg: HumanMessage = { id, idx, ...params, role: "human" };
   msgStore.set(msg.id, msg);
@@ -76,7 +76,7 @@ export function addHumanMessage(params: CreateHumanMessage) {
   return msg;
 }
 
-export function addSystemMessage(params: CreateSystemMessage) {
+export function addSystemMessage(params: AddSystemMessage) {
   const id = ++idx;
   let msg: SystemMessage = { id, idx, ...params, role: "system" };
   msgStore.set(msg.id, msg);
@@ -84,7 +84,7 @@ export function addSystemMessage(params: CreateSystemMessage) {
   return msg;
 }
 
-export function addToolResultMessage(params: CreateToolResultMessage) {
+export function addToolResultMessage(params: AddToolResultMessage) {
   const id = ++idx;
   let msg: ToolResultMessage = { id, idx, ...params, role: "tool" };
   msgStore.set(msg.id, msg);
