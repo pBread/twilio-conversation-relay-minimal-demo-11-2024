@@ -98,5 +98,11 @@ export async function startRun() {
 }
 
 export function abort() {
-  return controller?.abort();
+  controller?.abort();
+  controller = undefined;
+  return;
+}
+
+export function reset() {
+  abort();
 }

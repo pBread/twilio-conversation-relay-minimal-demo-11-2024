@@ -3,8 +3,9 @@ import express from "express";
 import ExpressWs from "express-ws";
 import * as demo from "../demo";
 import * as log from "./logger";
+import * as state from "./state";
 import * as twlo from "./twilio";
-import * as gemini from "./gemini";
+import * as llm from "./gemini";
 import type { CallStatus } from "./twilio-types";
 
 dotenv.config();
@@ -13,14 +14,6 @@ const { HOSTNAME, PORT = "3000", RECORD_CALL } = process.env;
 const { app } = ExpressWs(express());
 app.use(express.urlencoded({ extended: true })).use(express.json());
 
-app.use("/debug", async (req, res) => {
-  try {
-    await gemini.startRun();
-  } catch (error) {
-    log.error("debug route error", error);
-  }
-});
-
 /****************************************************
  Twilio Voice Webhook Endpoints
 ****************************************************/
@@ -28,24 +21,26 @@ app.post("/incoming-call", async (req, res) => {
   try {
     // reset demo
     log.reset();
+    llm.reset();
+    state.reset();
 
     // respond with ConversationRelay TwiML
     const { CallSid, From, To } = req.body;
     log.success(`/incoming-call From ${From} To ${To} CallSid ${CallSid}`);
 
     res.status(200).type("text/xml").end(`\
-  <Response>
-      <Connect>
-          <ConversationRelay 
-              url="wss://${HOSTNAME}/convo-relay/${CallSid}" 
-              welcomeGreeting="${demo.greeting}"
-              welcomeGreetingInterruptible="true"
-  
-              voice="${demo.tts.voice}"
-              ttsProvider="${demo.tts.provider}"
-          />
-      </Connect>
-  </Response>
+<Response>
+    <Connect>
+        <ConversationRelay 
+            url="wss://${HOSTNAME}/convo-relay/${CallSid}" 
+            welcomeGreeting="${demo.greeting}"
+            welcomeGreetingInterruptible="true"
+
+            voice="${demo.tts.voice}"
+            ttsProvider="${demo.tts.provider}"
+        />
+    </Connect>
+</Response>
   `);
   } catch (error) {
     log.error("/incoming-call webhook error", error);
