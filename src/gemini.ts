@@ -66,6 +66,7 @@ function translateMessage(msg: state.StoreMessage): Content | undefined {
 }
 
 export async function startRun() {
+  // systemInstructions will be overriden by the latest system message
   let systemInstruction: string = demo.llm.instructions;
 
   let history: Content[] = [];

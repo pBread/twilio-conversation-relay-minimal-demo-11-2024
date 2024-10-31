@@ -69,16 +69,30 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
   twlo.setCallSid(callSid);
   twlo.setWs(ws);
 
+  // add initial chat state
   state.addSystemMessage({ content: demo.llm.instructions });
   state.addAIMessage({ content: demo.greeting, type: "text" });
 
+  if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
+  else log.warn("call is not being recorded");
+
+  // log lifecycle
   log.info(`/convo-relay websocket initializing`);
   twlo.onMessage("setup", () =>
     log.success(`/convo-relay websocket initializing`)
   );
 
-  if (RECORD_CALL?.toLowerCase() === "true") twlo.startCallRecording();
-  else log.warn("call is not being recorded");
+  // send human transcript to LLM
+  twlo.onMessage("prompt", (msg) => {
+    if (!msg.last) return; // ignore partial speech
+
+    log.success(`human transcript complete:\n${msg.voicePrompt}`);
+
+    state.addHumanMessage({ content: msg.voicePrompt }); // create the message record before starting the run
+    llm.startRun(); // the llm run will execute tools and generate text
+  });
+
+  //
 });
 
 /****************************************************
