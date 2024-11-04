@@ -35,7 +35,7 @@ function translateMessage(msg: state.StoreMessage): Content | undefined {
   let param: Content | undefined;
 
   // system messages are sent to Gemini via systemInstructions param.
-  // currently, the last system message overrides the demo.llm.instructions
+  // Currently, the last system message overrides the demo.llm.instructions
   // and all previous system messages
   if (msg.role === "system") return;
 
@@ -68,8 +68,6 @@ function translateMessage(msg: state.StoreMessage): Content | undefined {
 }
 
 export async function startRun() {
-  let chat: ChatSession;
-
   const stateMsgs = state.getMessages();
 
   // systemInstruction use the "instructions" in the demo configuration by default
@@ -78,6 +76,54 @@ export async function startRun() {
   const systemInstruction =
     [...stateMsgs].reverse().find((msg) => msg.role === "system")?.content ??
     demo.llm.instructions;
+
+  let history: Content[] = [];
+  for (const msg of stateMsgs) {
+    const param = translateMessage(msg);
+    if (param) history.push(param);
+  }
+
+  // Gemini's SDK separates message history from the chat completion
+  // Hence, the prompt message is removed from history. Other LLMs function differently.
+  const prompt = history.shift();
+  if (!prompt)
+    throw Error(`Cannot start run because there are no messages in state`);
+
+  const model = genAI.getGenerativeModel({
+    model: demo.llm.model || "gemini-1.5-pro",
+    systemInstruction,
+  });
+  const chat = model.startChat({
+    history: history.reverse(), // gemini expects first element to be the latest message
+    tools: [{ functionDeclarations }],
+  });
+
+  controller = new AbortController();
+
+  try {
+    // Gemini's streaming API does not support functions, as of Nov 4, 2024, hence the REST API is used
+    const result = await chat.sendMessage(prompt.parts);
+    log.debug("startRun result", JSON.stringify(result, null, 2));
+
+    const candidate = result.response.candidates?.[0];
+
+    const fnCall = candidate?.content.parts?.[0]?.functionCall;
+    const text = candidate?.content.parts?.[0]?.text;
+
+    if (!fnCall && !text)
+      throw Error(
+        `Unexpected result from Gemini's API: ${JSON.stringify(result)}`
+      );
+
+    // Gemini's model is saying something
+    if (text) {
+      state.addAIMessage({ content: text, type: "text" });
+      eventEmitter.emit("speech", text, !!candidate.finishReason);
+    }
+
+    if (fnCall) {
+    }
+  } catch (error) {}
 }
 
 export async function _startRun() {
