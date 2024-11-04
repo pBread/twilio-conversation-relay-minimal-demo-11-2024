@@ -79,7 +79,7 @@ app.ws("/convo-relay/:callSid", (ws, req) => {
   // log lifecycle
   log.info(`/convo-relay websocket initializing`);
   twlo.onMessage("setup", () =>
-    log.success(`/convo-relay websocket initializing`)
+    log.success(`/convo-relay websocket initialized`)
   );
 
   // send human transcript to llm
