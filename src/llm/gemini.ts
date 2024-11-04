@@ -30,6 +30,8 @@ for (const [name, fn] of Object.entries(fns))
     description: fn.description,
   });
 
+export async function startRun() {}
+
 /****************************************************
  Misc
 ****************************************************/
