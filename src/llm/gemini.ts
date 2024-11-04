@@ -27,7 +27,7 @@ let functionDeclarations: FunctionDeclaration[] = [];
 for (const [name, fn] of Object.entries(fns))
   functionDeclarations.push({
     name: name,
-    // parameters: fn.parameters,
+    parameters: fn.parameters,
     description: fn.description,
   });
 
@@ -68,6 +68,19 @@ function translateMessage(msg: state.StoreMessage): Content | undefined {
 }
 
 export async function startRun() {
+  let chat: ChatSession;
+
+  const stateMsgs = state.getMessages();
+
+  // systemInstruction use the "instructions" in the demo configuration by default
+  // but are overridden by system messages added to the message state. This is
+  // because Gemini does not support "system" messages.
+  const systemInstruction =
+    [...stateMsgs].reverse().find((msg) => msg.role === "system")?.content ??
+    demo.llm.instructions;
+}
+
+export async function _startRun() {
   let runAgain = false;
   let chat: ChatSession;
   // systemInstructions will be overriden by the latest system message
