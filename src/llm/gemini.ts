@@ -1,5 +1,4 @@
 import {
-  ChatSession,
   Content,
   FunctionCall,
   FunctionDeclaration,
@@ -58,7 +57,8 @@ function translateMessage(msg: state.StoreMessage): Content | undefined {
 
   if (msg.role === "tool")
     param = {
-      role: "model",
+      role: "function",
+
       parts: [
         { functionResponse: JSON.parse(msg.content) as FunctionResponse },
       ],
@@ -80,12 +80,24 @@ export async function startRun() {
   let history: Content[] = [];
   for (const msg of stateMsgs) {
     const param = translateMessage(msg);
+    if (!param) continue;
+
+    if (msg.role === "tool") {
+      const lastParam = history[history.length - 1];
+      lastParam.parts.push(...param?.parts);
+      lastParam.role === "function";
+
+      continue;
+    }
+
     if (param) history.push(param);
   }
 
+  log.debug(`raw history`, JSON.stringify(history, null, 2));
+
   // Gemini's SDK separates message history from the chat completion
   // Hence, the prompt message is removed from history. Other LLMs function differently.
-  const prompt = history.shift();
+  const prompt = history[history.length - 1];
   if (!prompt)
     throw Error(`Cannot start run because there are no messages in state`);
 
@@ -99,6 +111,14 @@ export async function startRun() {
   });
 
   controller = new AbortController();
+
+  log.debug(
+    "gemini request",
+    "\nhistory\n",
+    JSON.stringify(history, null, 2),
+    "prompt\n",
+    JSON.stringify(prompt, null, 2)
+  );
 
   try {
     // Gemini's streaming API does not support functions, as of Nov 4, 2024, hence the REST API is used
@@ -122,6 +142,8 @@ export async function startRun() {
     }
 
     if (fnCall) {
+      log.debug("function call start", JSON.stringify(result, null, 2));
+
       // add the AI's tool execution request to state
       const toolMsg = state.addAIMessage({
         content: JSON.stringify(fnCall),
@@ -132,10 +154,10 @@ export async function startRun() {
       if (!fn) log.error(`function not found. name: ${fnCall.name}`);
 
       const response = await fn(fnCall.args);
-      log.info(`function result`, response);
+      log.info(`fn ${fnCall.name} response`, response);
 
       state.addToolResultMessage({
-        content: JSON.stringify(response),
+        content: JSON.stringify({ name: fnCall.name, response }),
         parentId: toolMsg.id,
       });
 
@@ -152,93 +174,6 @@ export async function startRun() {
   } catch (error) {
     log.error(`error in gemini completion request`, error);
   }
-}
-
-export async function _startRun() {
-  let runAgain = false;
-  let chat: ChatSession;
-  // systemInstructions will be overriden by the latest system message
-  let systemInstruction: string = demo.llm.instructions;
-
-  let history: Content[] = [];
-  const stateMsgs = state.getMessages();
-  for (const msg of stateMsgs) {
-    if (msg.role === "system") systemInstruction = msg.content;
-    const param = translateMessage(msg);
-    if (param) history.push(param);
-  }
-
-  const prompt = history.shift();
-  if (!prompt)
-    throw Error(`Cannot start run because there are no messages in state`);
-
-  const model = genAI.getGenerativeModel({
-    model: demo.llm.model || "gemini-1.5-pro",
-    systemInstruction,
-  });
-  chat = model.startChat({
-    history: history.reverse(),
-    tools: [{ functionDeclarations }],
-  });
-
-  controller = new AbortController();
-
-  log.debug("history arg", JSON.stringify(history, null, 2));
-
-  try {
-    // gemini's streaming API doesn't support streaming hence using the REST API
-    const result = await chat.sendMessage(prompt.parts);
-    log.debug("result", JSON.stringify(result, null, 2));
-    const candidate = result.response?.candidates?.[0];
-
-    const fnCall = candidate?.content.parts?.[0]?.functionCall;
-    const text = candidate?.content.parts?.[0]?.text;
-
-    if (fnCall) {
-      const toolMsg = state.addAIMessage({
-        content: JSON.stringify(fnCall),
-        type: "tool",
-      });
-      const fn = fns[fnCall.name as keyof typeof fns];
-      if (!fn) log.error(`function not found. name: ${fnCall.name}`);
-      runAgain = true;
-
-      const response = await fn(fnCall.args);
-      log.info(`function result`, response);
-
-      state.addToolResultMessage({
-        content: JSON.stringify(response),
-        parentId: toolMsg.id,
-      });
-
-      const fnResult = await chat.sendMessage([
-        { functionResponse: { name: fnCall.name, response } },
-      ]);
-      const txt = fnResult.response?.candidates?.[0].content.parts[0]
-        .text as string;
-      state.addAIMessage({ content: txt, type: "text" });
-      eventEmitter.emit("speech", txt, !!candidate.finishReason);
-    }
-
-    if (text) {
-      state.addAIMessage({ content: text, type: "text" });
-      eventEmitter.emit("speech", text, !!candidate.finishReason);
-    }
-  } catch (error) {
-    log.error(`error in gemini completion request`, error);
-  }
-
-  controller = undefined;
-  // if (runAgain) startRun();
-
-  log.debug(
-    "state messages after",
-    JSON.stringify(state.getMessages(), null, 2)
-  );
-  log.debug(
-    "chat message after",
-    JSON.stringify(await chat.getHistory(), null, 2)
-  );
 }
 
 export function abort() {
