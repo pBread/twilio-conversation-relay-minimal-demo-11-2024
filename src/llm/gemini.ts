@@ -122,8 +122,36 @@ export async function startRun() {
     }
 
     if (fnCall) {
+      // add the AI's tool execution request to state
+      const toolMsg = state.addAIMessage({
+        content: JSON.stringify(fnCall),
+        type: "tool",
+      });
+
+      const fn = fns[fnCall.name as keyof typeof fns];
+      if (!fn) log.error(`function not found. name: ${fnCall.name}`);
+
+      const response = await fn(fnCall.args);
+      log.info(`function result`, response);
+
+      state.addToolResultMessage({
+        content: JSON.stringify(response),
+        parentId: toolMsg.id,
+      });
+
+      const fnResult = await chat.sendMessage([
+        { functionResponse: { name: fnCall.name, response } },
+      ]);
+
+      const txt = fnResult.response?.candidates?.[0].content.parts[0]
+        .text as string;
+
+      state.addAIMessage({ content: txt, type: "text" });
+      eventEmitter.emit("speech", txt, !!candidate.finishReason);
     }
-  } catch (error) {}
+  } catch (error) {
+    log.error(`error in gemini completion request`, error);
+  }
 }
 
 export async function _startRun() {
