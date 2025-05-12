@@ -32,4 +32,4 @@ next-env.d.ts
 
 # logging
 logs/*
-
+local/*
